@@ -10,6 +10,7 @@ de feature, que não compartilham arquivos com a `main`.
 |--------|----------|--------|
 | `feat/driver-it5702` | Driver USB HID, CLI, regra udev e `pyproject.toml` | em desenvolvimento |
 | `feat/dram-smbus` | Memórias RGB via SMBus (ENE); ramificada de `feat/driver-it5702` | em desenvolvimento |
+| `feat/service` | Perfil e serviço do systemd que aplica a iluminação no login; ramificada de `feat/dram-smbus` | em desenvolvimento |
 
 ## Documentação
 - [Hardware](docs/hardware.md)

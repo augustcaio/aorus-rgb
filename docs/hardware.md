@@ -79,5 +79,12 @@ DRAM de segunda geração, suportado pelo OpenRGB. Detalhes em
 
 `led_c1`, `led_c2` (RGB 12V) e `led_cpu` não têm nada ligado ou visível.
 
+O chip guarda configuração com o PC desligado: as fans ligam no estado salvo
+há tempos pelo RGB Fusion (apagadas). Nenhum efeito de onda do chip (6, 9-12,
+por zona ou placa inteira) anima os headers ARGB; o arco-íris animado do RGB
+Fusion é, muito provavelmente, gerado pelo software, como o `rainbow` daqui.
+O rainbow animado pelo serviço (`feat/service`) ficou igual ao padrão do RGB
+Fusion.
+
 ## Pendências
 - Conectar o ARGB da bomba do H55 (em `D_LED2`, nunca nos headers 12V) e testar.

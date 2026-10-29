@@ -80,10 +80,30 @@ fan), de qualquer marca. Ferramentas auxiliares:
     aorus-rgb count d_led1 12          # acende os primeiros 12 LEDs em branco
     aorus-rgb color d_led1 ff0000 --leds 60  # usa 60 LEDs só nesta execução
 
+## Serviço (iluminação automática no login)
+Branch `feat/service`. Escolha o perfil e instale o serviço de usuário (sem sudo):
+
+    aorus-rgb profile rainbow all     # perfil padrão (ou: effect all pulse ff00ff, color all 00ff00...)
+    aorus-rgb profile                 # mostra o perfil salvo
+    ./install-service.sh              # instala, habilita e inicia
+    ./install-service.sh --uninstall  # remove
+
+O serviço roda `aorus-rgb run`, que aplica o perfil salvo (ou `rainbow all` se
+não houver). Acompanhar e controlar:
+
+    systemctl --user status aorus-rgb
+    journalctl --user -u aorus-rgb -b
+    systemctl --user restart aorus-rgb   # depois de trocar o perfil
+
+No `rainbow` animado, os headers ARGB são animados pelo PC e as memórias usam o
+rainbow do próprio chip ENE: animá-las pelo PC ocuparia o SMBus ~36% do tempo
+(24 ms por quadro), disputando o barramento com o BIOS. Medido no serviço: menos
+de 1% de CPU e 9 MB de memória.
+
 ## Estado e configuração
 | Arquivo | Conteúdo | Validade |
 |---------|----------|----------|
-| `~/.config/aorus-rgb/config.json` | LEDs calibrados por header | permanente |
+| `~/.config/aorus-rgb/config.json` | LEDs calibrados por header e perfil | permanente |
 | `~/.local/state/aorus-rgb/state.json` | máscara `0x32` e inicialização da placa | boot atual |
 
 No primeiro comando de cada boot, a placa é inicializada (efeitos zerados e
