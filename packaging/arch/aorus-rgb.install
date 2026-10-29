@@ -1,0 +1,18 @@
+post_install() {
+  modprobe i2c-dev 2>/dev/null || true
+  udevadm trigger --subsystem-match=hidraw --subsystem-match=i2c-dev 2>/dev/null || true
+  cat <<'MSG'
+==> aorus-rgb instalado. Para aplicar o perfil no login (como usuário, sem sudo):
+      systemctl --user enable --now aorus-rgb
+==> As memórias RGB precisam do parâmetro de kernel acpi_enforce_resources=lax
+    (UKI: /etc/kernel/cmdline + mkinitcpio -P; GRUB: GRUB_CMDLINE_LINUX_DEFAULT
+    + grub-mkconfig). O pacote não altera o boot.
+==> Quem usava a versão de desenvolvimento: rode ./install-service.sh --uninstall
+    no repositório e remova /etc/udev/rules.d/70-aorus-rgb.rules.
+MSG
+}
+
+post_upgrade() {
+  udevadm trigger --subsystem-match=hidraw --subsystem-match=i2c-dev 2>/dev/null || true
+  echo "==> aorus-rgb atualizado: systemctl --user restart aorus-rgb"
+}

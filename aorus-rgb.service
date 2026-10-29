@@ -1,12 +1,13 @@
 # Serviço de usuário: aplica o perfil de iluminação (aorus-rgb run) no login.
-# Instalação: ./install-service.sh
+# Pacote: /usr/lib/systemd/user/aorus-rgb.service (systemctl --user enable --now aorus-rgb)
+# Desenvolvimento: ./install-service.sh, que troca o ExecStart pelo venv
 [Unit]
 Description=aorus-rgb: perfil de iluminação RGB da placa e das memórias
 Documentation=https://github.com/augustcaio/aorus-rgb
 
 [Service]
 Type=exec
-ExecStart=%h/.venvs/aorus-rgb/bin/aorus-rgb run
+ExecStart=/usr/bin/aorus-rgb run
 # o rainbow animado trata SIGINT (Ctrl+C) e encerra de forma limpa
 KillSignal=SIGINT
 # placa ou SMBus ainda indisponíveis no login: tenta de novo
