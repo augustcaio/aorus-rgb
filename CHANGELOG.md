@@ -31,8 +31,9 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
   recebe a zona como primeiro argumento.
 
 - O aplicar (`0x28`) usa a máscara só das zonas alteradas.
-- No `rainbow` animado, as memórias usam o rainbow do chip ENE em vez de
-  receber quadros pelo SMBus; o laço mantém 30 quadros/s.
+- No `rainbow` animado, as memórias recebem os quadros com a mesma fase das
+  fans (15/s), cada pente num único bloco SMBus de 24 bytes; o laço mantém
+  30 quadros/s.
 
 ### Removed
 - **Quebra:** efeito de hardware `wave`, que apaga os headers ARGB nesta
@@ -42,4 +43,5 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 - Definir cor em um header ARGB religava o efeito embutido do outro.
 - Efeitos animados apagavam os headers ARGB depois de usar o RGB Fusion.
 - `pulse` com brilho acima de 100 apagava os LEDs.
+- Memórias fora de sincronia com as fans no `rainbow` animado.
 - Cores e arco-íris usavam 32 LEDs, independentemente das fans.
