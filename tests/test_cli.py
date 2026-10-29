@@ -22,7 +22,7 @@ from aorus_rgb.__main__ import (
     resolve,
 )
 from aorus_rgb.config import Config
-from aorus_rgb.dram import DramController, rainbow_speed
+from aorus_rgb.dram import DramController
 
 
 def devices(board, dram=None):
@@ -199,39 +199,51 @@ def test_calibrate_needs_an_interactive_terminal(controller, monkeypatch):
 
 # --- rainbow animado ------------------------------------------------------
 
-def stop_after_first_frame(monkeypatch):
-    """Simula Ctrl+C na pausa entre quadros, só no laço da CLI."""
+def stop_after_frames(monkeypatch, frames=1):
+    """Simula Ctrl+C depois de `frames` quadros, só no laço da CLI."""
+    calls = []
 
     class Clock:
         monotonic = staticmethod(time.monotonic)
 
         @staticmethod
         def sleep(seconds):
-            raise KeyboardInterrupt
+            calls.append(seconds)
+            if len(calls) >= frames:
+                raise KeyboardInterrupt
 
     monkeypatch.setattr("aorus_rgb.__main__.time", Clock)
 
 
-def test_animated_rainbow_runs_memory_on_chip_and_board_from_pc(controller, transport, monkeypatch):
-    stop_after_first_frame(monkeypatch)
+def stop_after_first_frame(monkeypatch):
+    stop_after_frames(monkeypatch, 1)
+
+
+def memory_frames(bus, address):
+    return [e[3] for e in bus.log if e[:3] == ("block", address, 0x03)]
+
+
+def test_animated_rainbow_streams_memory_in_phase_with_the_board(controller, transport, monkeypatch):
+    stop_after_frames(monkeypatch, 3)
     bus = FakeSMBus([FakeEne(1, led_count=8), FakeEne(3, led_count=8)])
     run(cmd_rainbow, controller, "rainbow", "all", dram=DramController(bus))
+    board_frames = [pkt for pkt in transport.sent if pkt[1] == 0x58 and pkt[2:4] == b"\x00\x00"]
+    assert len(board_frames) == 3                     # placa: todo quadro (1º pacote de cada)
+    for address in (0x70, 0x71):
+        frames = memory_frames(bus, address)
+        assert len(frames) == 2                       # memórias: quadros 1 e 3
+        t = 2 * 5 / 1000                              # fase do 3º quadro (speed 5)
+        r, g, b = rainbow_frame(8, t, 1.0)[0]
+        assert frames[-1][:3] == [r, b, g]            # mesma fase da placa, ordem R,B,G
     for chip in bus.chips:
-        assert chip.regs[ene.REG_MODE] == ene.MODES["rainbow"]
-        assert chip.regs[ene.REG_DIRECT] == 0
-        assert chip.colors(0x8100, 8) == [0] * 24  # nenhuma cor direta pelo SMBus
-    assert {pkt[1] for pkt in transport.sent} >= {0x58, 0x59}  # placa animada pelo PC
+        assert chip.regs[ene.REG_DIRECT] == 1         # cores do PC, não o rainbow do chip
 
 
-def test_animated_rainbow_on_memory_only_returns_immediately(controller):
+def test_animated_rainbow_on_memory_only_also_streams(controller, monkeypatch):
+    stop_after_first_frame(monkeypatch)
     bus = FakeSMBus([FakeEne(1)])
-    run(cmd_rainbow, controller, "rainbow", "dram", dram=DramController(bus))  # sem laço
-    assert bus.chips[0].regs[ene.REG_MODE] == ene.MODES["rainbow"]
-
-
-@pytest.mark.parametrize("speed, expected", [(1, 4), (5, 2), (10, 0), (50, 0)])
-def test_rainbow_speed_maps_to_ene(speed, expected):
-    assert rainbow_speed(speed) == expected
+    run(cmd_rainbow, controller, "rainbow", "dram", dram=DramController(bus))
+    assert len(memory_frames(bus, 0x70)) == 1
 
 
 # --- perfil e run ---------------------------------------------------------

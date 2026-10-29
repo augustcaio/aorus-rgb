@@ -135,15 +135,18 @@ def rainbow_frame(n, t, value):
 
 
 RAINBOW_FPS = 30
+# As memórias recebem 1 de cada N quadros, sempre com a mesma fase: continuam
+# sincronizadas com as fans e o SMBus (que o BIOS também usa) fica ocupado
+# ~10% do tempo em vez de ~21%.
+DRAM_FRAME_DIVIDER = 2
 
 
 def cmd_rainbow(devs, a):
-    """Onda de arco-íris; com `all`, headers ARGB e memórias juntos.
+    """Onda de arco-íris gerada pelo PC; com `all`, headers ARGB e memórias juntos.
 
-    Estático (--speed 0): o PC pinta tudo uma vez. Animado: os headers ARGB
-    são animados pelo PC (USB, ~9 ms por quadro) e as memórias usam o rainbow
-    do próprio chip ENE. Animá-las pelo PC ocuparia o SMBus em ~36% do tempo,
-    disputando o barramento com o BIOS (acpi_enforce_resources=lax).
+    Tudo é calculado com a mesma fase a cada quadro, então placa e memórias
+    ficam sincronizadas. O rainbow do próprio chip ENE não é usado: tem
+    relógio próprio e sai de sincronia com as fans.
     """
     targets = [(ctl, z) for ctl, z in resolve(a.zone, devs) if z.addressable]
     if a.leds:
@@ -156,18 +159,16 @@ def cmd_rainbow(devs, a):
         for ctl, z in targets:
             ctl.set_colors(z, rainbow_frame(ctl.led_count(z), 0.0, v))
         return
-    for ctl, z in targets:
-        if isinstance(z, DramZone):
-            ctl.set_rainbow(z, a.speed)
-    animated = [(ctl, z) for ctl, z in targets if not isinstance(z, DramZone)]
-    if not animated:
-        return
     t = 0.0
+    frame = 0
     deadline = time.monotonic()
     try:
         while True:
-            for ctl, z in animated:
+            for ctl, z in targets:
+                if isinstance(z, DramZone) and frame % DRAM_FRAME_DIVIDER:
+                    continue
                 ctl.set_colors(z, rainbow_frame(ctl.led_count(z), t, v))
+            frame += 1
             t = (t + a.speed / 1000) % 1
             deadline += 1 / RAINBOW_FPS
             time.sleep(max(0.0, deadline - time.monotonic()))
