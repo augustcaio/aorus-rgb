@@ -41,8 +41,13 @@ O prefixo `70-` é necessário: a tag `uaccess` precisa ser aplicada antes de
 `73-seat-late.rules`.
 
 ## Uso
-    aorus-rgb info
-    aorus-rgb static ff0000 --header 1 --leds 32
-    aorus-rgb rainbow --header 1 --leds 32
-    aorus-rgb effect pulse 00ff00
-    aorus-rgb off
+Zonas: `d_led1`, `d_led2` (ARGB), `led_c1`, `led_cpu`, `led_c2` (RGB) ou `all`.
+
+    aorus-rgb info                              # controlador e zonas
+    aorus-rgb color d_led1 ff0000               # cor fixa
+    aorus-rgb color d_led1 ff0000 --leds 60     # ajusta o tamanho do strip
+    aorus-rgb effect all pulse 00ff00 --speed 3 # efeito de hardware (speed 0-9)
+    aorus-rgb rainbow d_led2                    # animação por software (Ctrl+C)
+    aorus-rgb off                               # apaga tudo (ou: off led_c1)
+
+Efeitos: `static`, `pulse`, `flash`, `cycle`, `wave`, `random`.
