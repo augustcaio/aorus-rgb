@@ -30,4 +30,10 @@ Exemplos:
 Os commits têm um único autor (`augustcaio`), sem trailers `Co-Authored-By`.
 
 ## Versões
-Tags `vMAJOR.MINOR.PATCH`; atualizar o `CHANGELOG.md` a cada release.
+- Cada versão estável ganha uma branch `release/X.Y.Z`, criada a partir da
+  feature que reúne o código validado, com a versão do `pyproject.toml`
+  atualizada e a tag `vX.Y.Z` no commit `chore(release): X.Y.Z`.
+- A branch de release não recebe desenvolvimento; correções numa versão
+  publicada viram `release/X.Y.Z+1` (patch).
+- A cada release, a seção `[Unreleased]` do `CHANGELOG.md` vira `[X.Y.Z]`, e a
+  release entra na tabela de branches do `README.md`.

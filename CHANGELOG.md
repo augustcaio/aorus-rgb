@@ -6,6 +6,11 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-29
+
+Primeira versão estável, validada na B550M AORUS ELITE. Branch
+`release/1.0.0`, tag `v1.0.0`.
+
 ### Added
 - `feat/driver-it5702`: driver USB HID para o controlador ITE IT5702
   (RGB Fusion 2.0), regra udev e `pyproject.toml` com extras de desenvolvimento.
@@ -47,3 +52,6 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 - No login, a primeira execução do serviço falhava por falta de permissão;
   o `run` agora espera o acesso à placa e às memórias.
 - Cores e arco-íris usavam 32 LEDs, independentemente das fans.
+
+[Unreleased]: https://github.com/augustcaio/aorus-rgb/compare/v1.0.0...feat/service
+[1.0.0]: https://github.com/augustcaio/aorus-rgb/tree/v1.0.0
