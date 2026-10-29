@@ -1,35 +1,16 @@
-"""Driver do controlador ITE IT5702/IT8297 (RGB Fusion 2.0) via hidraw.
+"""Acesso ao ITE IT5702 via hidraw e operações por zona."""
 
-Protocolo baseado no driver do OpenRGB (GigabyteRGBFusion2USBController).
-Tudo é feito com feature reports de 64 bytes, report id 0xCC.
-"""
-
+import dataclasses
 import fcntl
 import glob
+import json
 import os
-import struct
 import time
+from pathlib import Path
+
+from . import protocol as p
 
 VID, PID = 0x048D, 0x5702
-REPORT_ID = 0xCC
-BUF = 64
-
-# headers ARGB endereçáveis (D_LED1 = 0x58, D_LED2 = 0x59)
-HDR_ARGB = {1: 0x58, 2: 0x59}
-# bit de cada header no registrador de "efeito embutido desligado" (0x32)
-HDR_BIT = {1: 0x01, 2: 0x02}
-
-# tamanhos de strip aceitos pelo hardware (índice = código enviado)
-LED_COUNT_STEPS = [32, 64, 256, 512, 1024]
-
-EFFECTS = {
-    "static": 1,
-    "pulse": 2,
-    "flash": 3,
-    "cycle": 4,
-    "wave": 6,
-    "random": 8,
-}
 
 _IOC_WRITE, _IOC_READ = 1, 2
 
@@ -38,8 +19,8 @@ def _hid_ioc(nr, size):
     return ((_IOC_READ | _IOC_WRITE) << 30) | (size << 16) | (ord("H") << 8) | nr
 
 
-HIDIOCSFEATURE = _hid_ioc(0x06, BUF)
-HIDIOCGFEATURE = _hid_ioc(0x07, BUF)
+HIDIOCSFEATURE = _hid_ioc(0x06, p.PACKET_SIZE)
+HIDIOCGFEATURE = _hid_ioc(0x07, p.PACKET_SIZE)
 
 
 class DeviceNotFound(Exception):
@@ -48,23 +29,89 @@ class DeviceNotFound(Exception):
 
 def find_hidraw():
     """Procura o hidraw do IT5702 via sysfs."""
-    want = f"{VID:08X}:{PID:08X}"
-    for uevent in glob.glob("/sys/class/hidraw/hidraw*/device/uevent"):
+    want = f"HID_ID=0003:{VID:08X}:{PID:08X}"
+    for uevent in sorted(glob.glob("/sys/class/hidraw/hidraw*/device/uevent")):
         with open(uevent) as f:
-            if f"HID_ID=0003:{want[:8]}:{want[9:]}".upper() in f.read().upper():
+            if want in f.read().upper():
                 return "/dev/" + uevent.split("/")[4]
     raise DeviceNotFound("controlador ITE 048d:5702 não encontrado")
 
 
-class Controller:
+class HidrawTransport:
     def __init__(self, path=None):
         self.path = path or find_hidraw()
         self.fd = os.open(self.path, os.O_RDWR)
-        self.effect_disabled = 0
-        self.info = self._read_info()
+
+    def send(self, packet):
+        fcntl.ioctl(self.fd, HIDIOCSFEATURE, packet)
+
+    def get(self):
+        buf = bytearray(p.PACKET_SIZE)
+        buf[0] = p.REPORT_ID
+        fcntl.ioctl(self.fd, HIDIOCGFEATURE, buf)
+        return bytes(buf)
 
     def close(self):
         os.close(self.fd)
+
+
+def _boot_id():
+    try:
+        return Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    except OSError:
+        return None
+
+
+class State:
+    """Estado que o chip não informa (máscara do comando 0x32).
+
+    Sem isso, cada execução da CLI começaria com a máscara zerada e religaria
+    o efeito embutido dos outros headers. O estado vale só para o boot atual:
+    ao ligar o PC o chip volta ao padrão, então o arquivo é descartado.
+    """
+
+    def __init__(self, path=None):
+        if path is None:
+            base = os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state"
+            path = Path(base) / "aorus-rgb" / "state.json"
+        self.path = Path(path)
+        self.builtin_off_mask = 0
+        try:
+            data = json.loads(self.path.read_text())
+            if data.get("boot_id") == _boot_id():
+                self.builtin_off_mask = int(data.get("builtin_off_mask", 0))
+        except (OSError, ValueError):
+            pass
+
+    def save(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        data = {"boot_id": _boot_id(), "builtin_off_mask": self.builtin_off_mask}
+        self.path.write_text(json.dumps(data))
+
+
+class MemoryState(State):
+    """Estado que não toca o disco (testes)."""
+
+    def __init__(self):
+        self.builtin_off_mask = 0
+
+    def save(self):
+        pass
+
+
+class Controller:
+    def __init__(self, transport=None, state=None):
+        self.transport = transport or HidrawTransport()
+        self.state = state if state is not None else State()
+        self.transport.send(p.command(p.CMD_INFO, 0x00))
+        self.info = p.parse_info(self.transport.get())
+
+    @property
+    def path(self):
+        return getattr(self.transport, "path", None)
+
+    def close(self):
+        self.transport.close()
 
     def __enter__(self):
         return self
@@ -72,100 +119,55 @@ class Controller:
     def __exit__(self, *exc):
         self.close()
 
-    # --- baixo nível -------------------------------------------------
-    def _send(self, *data):
-        buf = bytearray(BUF)
-        buf[0] = REPORT_ID
-        buf[1:1 + len(data)] = bytes(data)
-        self._send_raw(buf)
-
-    def _send_raw(self, buf):
-        fcntl.ioctl(self.fd, HIDIOCSFEATURE, bytes(buf))
-
-    def _get(self):
-        buf = bytearray(BUF)
-        buf[0] = REPORT_ID
-        fcntl.ioctl(self.fd, HIDIOCGFEATURE, buf)
-        return bytes(buf)
-
-    def _read_info(self):
-        self._send(0x60, 0x00)
-        b = self._get()
-        fw = struct.unpack_from("<I", b, 4)[0]
-        counts = [b[8] & 0xF, b[8] >> 4, b[9] & 0xF, b[9] >> 4, b[10] & 0xF, b[10] >> 4]
-        name = b[12:40].split(b"\0")[0].decode("ascii", "replace")
-        # ordem de cor de cada header ARGB (3 bytes: índices de R, G, B)
-        cal0, cal1 = struct.unpack_from("<II", b, 44)[0], struct.unpack_from("<I", b, 48)[0]
-        return {
-            "product": name,
-            "fw": ".".join(str((fw >> s) & 0xFF) for s in (0, 8, 16, 24)),
-            "device_num": b[2],
-            "strip_detect": b[3],
-            "argb_counts": [LED_COUNT_STEPS[min(c, 4)] for c in counts],
-            "cal": [cal0, cal1],
-            "raw": b,
-        }
-
-    # --- alto nível --------------------------------------------------
-    def set_led_count(self, hdr, count):
-        """Define o tamanho (arredondado p/ cima) do strip do header 1 ou 2."""
-        code = next((i for i, n in enumerate(LED_COUNT_STEPS) if count <= n), 4)
-        codes = [LED_COUNT_STEPS.index(c) for c in self.info["argb_counts"]]
-        codes[(hdr - 1)] = code
-        self._send(0x34, codes[1] << 4 | codes[0], codes[3] << 4 | codes[2], codes[5] << 4 | codes[4])
-        self.info["argb_counts"][hdr - 1] = LED_COUNT_STEPS[code]
-
-    def builtin_effects(self, hdr, enable):
-        bit = HDR_BIT[hdr]
-        self.effect_disabled = self.effect_disabled & ~bit if enable else self.effect_disabled | bit
-        self._send(0x32, self.effect_disabled)
+    # --- estado dos headers ARGB ----------------------------------------
+    def _set_builtin(self, zone, enabled):
+        """Liga/desliga o efeito embutido de um header ARGB."""
+        mask = self.state.builtin_off_mask
+        mask = mask & ~zone.builtin_bit if enabled else mask | zone.builtin_bit
+        self.transport.send(p.builtin_effect_off_packet(mask))
+        self.state.builtin_off_mask = mask
+        self.state.save()
         time.sleep(0.05)
 
-    def reset(self):
-        for reg in range(0x20, 0x28):
-            self._send(reg, 0, 0)
-        self._send(0x28, 0xFF, 0x00)
+    def led_count(self, zone):
+        return self.info.argb_counts[zone.cal_slot]
 
-    def _byte_order(self, hdr):
-        cal = self.info["cal"][hdr - 1]
-        return (cal >> 16) & 0xFF, (cal >> 8) & 0xFF, cal & 0xFF
+    def set_led_count(self, zone, count):
+        counts = list(self.info.argb_counts)
+        counts[zone.cal_slot] = p.LED_COUNT_STEPS[p.led_count_code(count)]
+        if tuple(counts) == self.info.argb_counts:
+            return
+        self.transport.send(p.led_count_packet(counts))
+        self.info = dataclasses.replace(self.info, argb_counts=tuple(counts))
 
-    def set_strip(self, hdr, colors):
-        """Envia cores diretas (lista de (r,g,b)) para um header ARGB."""
-        bo_r, bo_g, bo_b = self._byte_order(hdr)
-        sent = 0
-        for i in range(0, len(colors), 19):
-            chunk = colors[i:i + 19]
-            buf = bytearray(BUF)
-            buf[0], buf[1] = REPORT_ID, HDR_ARGB[hdr]
-            struct.pack_into("<H", buf, 2, sent)
-            buf[4] = len(chunk) * 3
-            for j, (r, g, b) in enumerate(chunk):
-                off = 5 + j * 3
-                buf[off + bo_r], buf[off + bo_g], buf[off + bo_b] = r, g, b
-            self._send_raw(buf)
-            sent += len(chunk) * 3
+    # --- operações por zona ---------------------------------------------
+    def set_colors(self, zone, colors):
+        """Cores individuais por LED (só zonas ARGB)."""
+        if self.state.builtin_off_mask & zone.builtin_bit == 0:
+            self._set_builtin(zone, False)
+        for packet in p.argb_packets(zone, colors, self.info.calibration[zone.cal_slot]):
+            self.transport.send(packet)
 
-    def set_effect(self, led, effect, color, brightness=255, speed=5):
-        """Efeito de hardware nos LEDs 'comuns' (led 0..7). led=-1 = todos."""
-        buf = bytearray(BUF)
-        buf[0] = REPORT_ID
-        if led == -1:
-            zone, buf[1] = 0xFF, 0x20
+    def set_color(self, zone, color):
+        """Cor fixa na zona inteira."""
+        if zone.addressable:
+            self.set_colors(zone, [color] * self.led_count(zone))
         else:
-            zone, buf[1] = 1 << led, 0x20 + led
-        struct.pack_into("<I", buf, 2, zone)
-        buf[11], buf[12], buf[13] = EFFECTS[effect], brightness, 0
-        r, g, b = color
-        struct.pack_into("<I", buf, 14, b | g << 8 | r << 16)
-        if effect == "pulse":
-            p = 400 + speed * 100 if speed <= 6 else 1000 + (speed - 6) * 200
-            struct.pack_into("<HHH", buf, 22, p, p, 200)
-        elif effect == "flash":
-            struct.pack_into("<HHH", buf, 22, 100, 100, speed * 200 + 700)
-        elif effect == "cycle":
-            p = speed * 100 + 300
-            struct.pack_into("<HH", buf, 22, p, p - 200)
-            buf[30] = 7
-        self._send_raw(buf)
-        self._send(0x28, 0xFF, 0x00)
+            self.set_effect(zone, "static", color)
+
+    def set_effect(self, zone, effect, color, brightness=255, speed=5, apply=True):
+        """Efeito de hardware (roda no chip, sem o PC enviar quadros)."""
+        if zone.addressable:
+            self._set_builtin(zone, True)
+        self.transport.send(p.effect_packet(zone, effect, color, brightness, speed))
+        if apply:
+            self.apply()
+
+    def apply(self):
+        self.transport.send(p.apply_packet())
+
+    def off(self, zone):
+        if zone.addressable:
+            self.set_colors(zone, [(0, 0, 0)] * self.led_count(zone))
+        else:
+            self.set_effect(zone, "none", (0, 0, 0))
