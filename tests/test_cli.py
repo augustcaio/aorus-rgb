@@ -3,7 +3,16 @@ import argparse
 import pytest
 
 from aorus_rgb import protocol as p
-from aorus_rgb.__main__ import build_parser, cmd_calibrate, cmd_count, cmd_rainbow, parse_color, rainbow_frame
+from aorus_rgb.__main__ import (
+    CHECK_PALETTE,
+    build_parser,
+    cmd_calibrate,
+    cmd_check,
+    cmd_count,
+    cmd_rainbow,
+    parse_color,
+    rainbow_frame,
+)
 
 
 def test_parse_color():
@@ -112,3 +121,23 @@ def test_calibrate_needs_an_interactive_terminal(controller, monkeypatch):
     monkeypatch.setattr("builtins.input", no_stdin)
     with pytest.raises(ValueError, match="terminal"):
         cmd_calibrate(controller, build_parser().parse_args(["calibrate", "d_led1"]))
+
+
+def test_check_paints_distinct_colors_and_clears_the_rest(controller, transport, capsys):
+    controller.config.set_leds("d_led1", 10)
+    cmd_check(controller, build_parser().parse_args(["check", "d_led1"]))
+    assert lit_leds(transport) == 10
+    assert "10 LEDs -> 1 vermelho, 2 laranja" in capsys.readouterr().out
+
+
+def test_check_palette_neighbours_differ():
+    colors = [rgb for _, rgb in CHECK_PALETTE]
+    assert len(set(colors)) == len(colors)
+
+
+def test_calibrate_uses_distinct_colors_not_white(controller, transport, monkeypatch):
+    answer_like_a_strip_of(12, transport, monkeypatch)
+    cmd_calibrate(controller, build_parser().parse_args(["calibrate", "d_led1"]))
+    first = next(pkt for pkt in transport.sent if pkt[1] == 0x58)
+    assert first[5:8] != b"\xff\xff\xff"  # LED 1 não é branco
+    assert controller.config.leds("d_led1") == 12
