@@ -95,10 +95,11 @@ não houver). Acompanhar e controlar:
     journalctl --user -u aorus-rgb -b
     systemctl --user restart aorus-rgb   # depois de trocar o perfil
 
-No `rainbow` animado, os headers ARGB são animados pelo PC e as memórias usam o
-rainbow do próprio chip ENE: animá-las pelo PC ocuparia o SMBus ~36% do tempo
-(24 ms por quadro), disputando o barramento com o BIOS. Medido no serviço: menos
-de 1% de CPU e 9 MB de memória.
+No `rainbow` animado, o PC calcula a mesma fase para fans e memórias a cada
+quadro, então tudo fica sincronizado. As fans recebem 30 quadros/s (USB, ~7 ms
+por quadro) e as memórias 15/s, cada pente num único bloco SMBus (~7 ms para os
+dois): o barramento, que o BIOS também usa, fica ocupado ~11% do tempo. Medido
+no serviço: menos de 1% de CPU e 9 MB de memória.
 
 ## Estado e configuração
 | Arquivo | Conteúdo | Validade |

@@ -11,7 +11,7 @@ Os registradores têm 16 bits e são acessados por um ponteiro:
 | Selecionar registrador | write word, comando `0x00`, valor com os bytes invertidos (`0x1000` → `0x0010`) |
 | Ler | read byte, comando `0x81` |
 | Escrever | write byte, comando `0x01` |
-| Escrever bloco | write block, comando `0x03` (até 3 bytes por vez no PIIX4) |
+| Escrever bloco | write block, comando `0x03`; o OpenRGB usa 3 bytes, mas o chip aceita o pente inteiro (24 bytes, 8 LEDs, testado lendo de volta) |
 
 ## Registradores
 | Registrador | Função |
@@ -43,6 +43,15 @@ Os registradores têm 16 bits e são acessados por um ponteiro:
    O pente daquele slot passa a responder no endereço novo.
 4. O remapeamento vale até o PC ser desligado; a CLI refaz a cada execução, se
    preciso.
+
+## Desempenho
+Um quadro de cores para os 2 pentes leva 7,1 ms com um bloco de 24 bytes por
+pente, contra 24,2 ms com blocos de 3 bytes (8 escritas de ponteiro + 8 de
+bloco por pente). No `rainbow` animado as memórias recebem 1 de cada 2 quadros
+(15/s), sempre na mesma fase das fans: o SMBus fica ocupado ~11% do tempo.
+
+O rainbow do próprio chip (modo 5) não é usado na animação: ele tem relógio
+próprio e sai de sincronia com as fans.
 
 ## Segurança
 O mesmo barramento tem a EEPROM SPD (`0x50`-`0x57`), com os timings que o BIOS

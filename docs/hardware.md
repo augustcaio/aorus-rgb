@@ -74,7 +74,7 @@ DRAM de segunda geração, suportado pelo OpenRGB. Detalhes em
 | Cor fixa | ✅ | ✅ (cada pente separado) |
 | `static`, `pulse`, `flash`, `cycle`, `random` | ✅ | ✅ (`pulse` testado) |
 | Wave de hardware | ❌ apaga os headers ARGB; removido | — |
-| `rainbow` animado e estático (software), sincronizado entre placa e memórias | ✅ | ✅ |
+| `rainbow` animado e estático (software), sincronizado entre placa e memórias | ✅ | ✅ (mesma fase, verificado por minutos) |
 | Remapeamento dos 2 pentes de `0x77` para `0x70`/`0x71` | — | ✅ |
 
 `led_c1`, `led_c2` (RGB 12V) e `led_cpu` não têm nada ligado ou visível.
