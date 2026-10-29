@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aorus-rgb"
-version = "0.1.0"
+version = "1.0.0"
 description = "Controle RGB da Gigabyte B550M Aorus Elite (ITE IT5702) no Linux"
 requires-python = ">=3.10"
 license = { text = "GPL-2.0-or-later" }
