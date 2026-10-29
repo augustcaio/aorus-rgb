@@ -31,8 +31,10 @@ versionado):
 
     git clean -fdX
 
-## Permissão no hidraw (uma vez)
-Sem regra udev, `/dev/hidraw*` só abre como root.
+## Permissões (uma vez)
+Sem regra udev, `/dev/hidraw*` e `/dev/i2c-*` só abrem como root. A regra dá
+acesso ao usuário logado apenas ao controlador da placa e ao SMBus dos slots
+de memória.
 
     sudo cp 70-aorus-rgb.rules /etc/udev/rules.d/
     sudo udevadm control --reload && sudo udevadm trigger
@@ -40,14 +42,26 @@ Sem regra udev, `/dev/hidraw*` só abre como root.
 O prefixo `70-` é necessário: a tag `uaccess` precisa ser aplicada antes de
 `73-seat-late.rules`.
 
+## SMBus das memórias (uma vez)
+Necessário só para as zonas `dram*` (branch `feat/dram-smbus`):
+
+1. Adicionar `acpi_enforce_resources=lax` ao fim de `/etc/kernel/cmdline`
+   (boot por UKI; com GRUB tradicional seria o `GRUB_CMDLINE_LINUX_DEFAULT`).
+2. `sudo mkinitcpio -P`
+3. `sudo pacman -S i2c-tools` e `echo i2c-dev | sudo tee /etc/modules-load.d/i2c-dev.conf`
+4. Reiniciar e conferir: `cat /sys/class/i2c-dev/*/name` deve listar
+   `SMBus PIIX4 adapter port 0 at 0b00`.
+
 ## Uso
-Zonas: `d_led1`, `d_led2` (ARGB), `led_c1`, `led_cpu`, `led_c2` (RGB) ou `all`.
+Zonas: `d_led1`, `d_led2` (ARGB), `led_c1`, `led_cpu`, `led_c2` (RGB),
+`dram1`, `dram2` (cada pente), `dram` (todos os pentes) ou `all`.
 
     aorus-rgb info                              # controlador e zonas
     aorus-rgb color d_led1 ff0000               # cor fixa
     aorus-rgb color d_led1 ff0000 --leds 60     # ajusta o tamanho do strip
     aorus-rgb effect all pulse 00ff00 --speed 3 # efeito de hardware (speed 0-9)
     aorus-rgb rainbow d_led2                    # animação por software (Ctrl+C)
+    aorus-rgb color dram ff0000                 # memórias
     aorus-rgb off                               # apaga tudo (ou: off led_c1)
 
 Efeitos: `static`, `pulse`, `flash`, `cycle`, `wave`, `random`.
