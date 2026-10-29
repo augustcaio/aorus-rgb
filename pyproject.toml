@@ -25,3 +25,5 @@ cache-dir = "~/.cache/aorus-rgb/ruff"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# sem .pytest_cache na pasta do projeto
+addopts = "-p no:cacheprovider"
