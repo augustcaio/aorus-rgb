@@ -3,7 +3,7 @@ import argparse
 import pytest
 
 from aorus_rgb import protocol as p
-from aorus_rgb.__main__ import build_parser, cmd_count, cmd_rainbow, parse_color, rainbow_frame
+from aorus_rgb.__main__ import build_parser, cmd_calibrate, cmd_count, cmd_rainbow, parse_color, rainbow_frame
 
 
 def test_parse_color():
@@ -65,3 +65,50 @@ def test_count_grows_the_strip_when_needed(controller, transport):
 def test_count_rejects_out_of_range():
     with pytest.raises(SystemExit):
         build_parser().parse_args(["count", "d_led1", "0"])
+
+
+def lit_leds(transport, reg=0x58):
+    """Quantos LEDs do início da faixa o último quadro deixou acesos."""
+    data = bytearray(256 * 3)
+    for pkt in transport.sent:
+        if pkt[1] == reg:
+            offset = pkt[2] | pkt[3] << 8
+            data[offset:offset + pkt[4]] = pkt[5:5 + pkt[4]]
+    return next((i for i in range(256) if data[i * 3:i * 3 + 3] == bytes(3)), 256)
+
+
+def answer_like_a_strip_of(physical, transport, monkeypatch):
+    """Responde como o usuário olhando uma faixa com `physical` LEDs."""
+    questions = []
+
+    def fake_input(prompt):
+        questions.append(prompt)
+        return "s" if lit_leds(transport) >= physical else "n"
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    return questions
+
+
+@pytest.mark.parametrize("physical", [1, 9, 54, 256])
+def test_calibrate_finds_and_saves_the_led_count(controller, transport, monkeypatch, physical):
+    questions = answer_like_a_strip_of(physical, transport, monkeypatch)
+    cmd_calibrate(controller, build_parser().parse_args(["calibrate", "d_led1"]))
+    assert controller.config.leds("d_led1") == physical
+    assert controller.led_count(p.ZONES["d_led1"]) == physical
+    assert len(questions) <= 9  # 1 conferência + busca binária em 256
+
+
+def test_calibrate_stops_when_256_is_not_enough(controller, transport, monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda prompt: "n")
+    with pytest.raises(ValueError, match="256"):
+        cmd_calibrate(controller, build_parser().parse_args(["calibrate", "d_led1"]))
+    assert controller.config.leds("d_led1") is None
+
+
+def test_calibrate_needs_an_interactive_terminal(controller, monkeypatch):
+    def no_stdin(prompt):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", no_stdin)
+    with pytest.raises(ValueError, match="terminal"):
+        cmd_calibrate(controller, build_parser().parse_args(["calibrate", "d_led1"]))

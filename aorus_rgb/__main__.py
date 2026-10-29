@@ -35,7 +35,9 @@ def cmd_info(c, a):
     for z in p.ZONES.values():
         if z.addressable:
             order = p.color_order_name(i.calibration[z.cal_slot])
-            print(f"  {z.name:<8} ARGB  {c.led_count(z)} LEDs, ordem {order}")
+            calibrated = c.config.leds(z.name)
+            leds = f"{calibrated} LEDs (calibrado)" if calibrated else f"{c.led_count(z)} LEDs (padrão; rode calibrate)"
+            print(f"  {z.name:<8} ARGB  {leds}, ordem {order}")
         else:
             print(f"  {z.name:<8} RGB   cor única")
 
@@ -86,13 +88,54 @@ def cmd_rainbow(c, a):
         pass
 
 
+def light_first(c, z, n):
+    """Acende os primeiros n LEDs em branco e apaga o resto da capacidade do chip."""
+    if n > c.chip_led_count(z):
+        c.set_chip_led_count(z, n)
+    c.set_colors(z, [(255, 255, 255)] * n + [(0, 0, 0)] * (c.chip_led_count(z) - n))
+
+
 def cmd_count(c, a):
-    """Acende os primeiros N LEDs em branco e apaga o resto, para contar a faixa."""
+    light_first(c, p.ZONES[a.zone], a.n)
+
+
+def ask_yes(question):
+    while True:
+        try:
+            answer = input(f"{question} [s/n] ").strip().lower()
+        except EOFError:
+            raise ValueError("calibrate é interativo: rode num terminal") from None
+        if answer in ("s", "sim", "y", "yes"):
+            return True
+        if answer in ("n", "nao", "não", "no"):
+            return False
+
+
+CALIBRATE_MAX = p.LED_COUNT_STEPS[2]  # 256: limite dos headers do IT57xx
+
+
+def cmd_calibrate(c, a):
+    """Busca binária guiada pelo menor N que acende todos os LEDs; salva o resultado.
+
+    Funciona com fans em cadeia (N = soma dos LEDs) e em splitter/hub paralelo
+    (N = LEDs da fan com mais LEDs), sem depender de marca ou modelo.
+    """
     z = p.ZONES[a.zone]
-    if a.n > c.led_count(z):
-        c.set_led_count(z, a.n)
-    total = c.led_count(z)
-    c.set_colors(z, [(255, 255, 255)] * a.n + [(0, 0, 0)] * (total - a.n))
+    light_first(c, z, CALIBRATE_MAX)
+    if not ask_yes(f"{z.name}: com {CALIBRATE_MAX} LEDs, todos os LEDs de todas as fans estão acesos?"):
+        raise ValueError(f"{z.name}: nem todos acendem com {CALIBRATE_MAX} LEDs; confira os cabos")
+    lo, hi = 1, CALIBRATE_MAX
+    while lo < hi:
+        mid = (lo + hi) // 2
+        light_first(c, z, mid)
+        if ask_yes(f"{z.name}: [{mid} LEDs] todos os LEDs de todas as fans estão acesos?"):
+            hi = mid
+        else:
+            lo = mid + 1
+    c.set_chip_led_count(z, lo)
+    c.config.set_leds(z.name, lo)
+    c.set_color(z, (255, 255, 255))
+    print(f"{z.name}: {lo} LEDs, salvo em {c.config.path}")
 
 
 def build_parser():
@@ -127,6 +170,10 @@ def build_parser():
     s.add_argument("n", type=int, choices=range(1, p.LED_COUNT_STEPS[2] + 1), metavar="N",
                    help=f"1-{p.LED_COUNT_STEPS[2]}")
     s.set_defaults(fn=cmd_count)
+
+    s = sub.add_parser("calibrate", help="descobre e salva quantos LEDs um header ARGB tem (interativo)")
+    s.add_argument("zone", choices=ARGB_CHOICES)
+    s.set_defaults(fn=cmd_calibrate)
 
     s = sub.add_parser("off", help="apaga uma zona")
     s.add_argument("zone", choices=ZONE_CHOICES, nargs="?", default="all")
