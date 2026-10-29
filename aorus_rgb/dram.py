@@ -13,7 +13,6 @@ EFFECT_TO_MODE = {
     "pulse": "breathing",
     "flash": "flashing",
     "cycle": "spectrum_cycle",
-    "wave": "rainbow",
     "random": "random_flicker",
 }
 

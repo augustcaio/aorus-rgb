@@ -11,7 +11,8 @@ from .smbus import BusNotFound, ForbiddenAddress
 
 DRAM_SLOTS = [f"dram{i}" for i in range(1, 5)]
 ZONE_CHOICES = [*p.ZONES, *DRAM_SLOTS, "dram", "all"]
-ANIMATABLE = [name for name, z in p.ZONES.items() if z.addressable] + DRAM_SLOTS
+ARGB_CHOICES = [name for name, z in p.ZONES.items() if z.addressable]
+ANIMATABLE = [*ARGB_CHOICES, *DRAM_SLOTS, "dram", "all"]
 
 
 def parse_color(s):
@@ -71,6 +72,13 @@ def resolve(name, devs):
     return pairs
 
 
+def board_argb(name, devs):
+    """Headers ARGB da placa: um pelo nome, ou todos com `all`."""
+    board = devs.get("board")
+    names = ARGB_CHOICES if name == "all" else [name]
+    return board, [p.ZONES[n] for n in names]
+
+
 def cmd_info(devs, a):
     board = devs.get("board", required=False)
     if board:
@@ -84,7 +92,12 @@ def cmd_info(devs, a):
         for z in p.ZONES.values():
             if z.addressable:
                 order = p.color_order_name(i.calibration[z.cal_slot])
-                print(f"  {z.name:<8} ARGB  {board.led_count(z)} LEDs, ordem {order}")
+                calibrated = board.config.leds(z.name)
+                leds = (
+                    f"{calibrated} LEDs (calibrado)" if calibrated
+                    else f"{board.led_count(z)} LEDs (padrão; rode calibrate)"
+                )
+                print(f"  {z.name:<8} ARGB  {leds}, ordem {order}")
             else:
                 print(f"  {z.name:<8} RGB   cor única")
     dram = devs.get("dram", required=False)
@@ -115,21 +128,120 @@ def cmd_off(devs, a):
         ctl.off(z)
 
 
+def rainbow_frame(n, t, value):
+    """Arco-íris de n LEDs com fase t (0-1)."""
+    return [tuple(int(x * 255) for x in colorsys.hsv_to_rgb((t + i / n) % 1, 1, value)) for i in range(n)]
+
+
 def cmd_rainbow(devs, a):
-    ((ctl, z),) = resolve(a.zone, devs)
-    if a.leds and isinstance(z, p.Zone):
-        ctl.set_led_count(z, a.leds)
-    n = ctl.led_count(z)
+    """Onda de arco-íris gerada pelo PC; com `all`, headers ARGB e memórias juntos."""
+    targets = [(ctl, z) for ctl, z in resolve(a.zone, devs) if z.addressable]
+    if a.leds:
+        for ctl, z in targets:
+            if isinstance(z, p.Zone):
+                ctl.set_led_count(z, a.leds)
     v = a.brightness / 255
+    if a.speed == 0:
+        # gradiente fixo: as cores diretas ficam nos chips depois que o comando sai
+        for ctl, z in targets:
+            ctl.set_colors(z, rainbow_frame(ctl.led_count(z), 0.0, v))
+        return
     t = 0.0
     try:
         while True:
-            frame = [tuple(int(x * 255) for x in colorsys.hsv_to_rgb((t + i / n) % 1, 1, v)) for i in range(n)]
-            ctl.set_colors(z, frame)
+            for ctl, z in targets:
+                ctl.set_colors(z, rainbow_frame(ctl.led_count(z), t, v))
             t = (t + a.speed / 1000) % 1
             time.sleep(1 / 30)
     except KeyboardInterrupt:
         pass
+
+
+# cores bem distintas entre vizinhos, para conferir LED por LED
+CHECK_PALETTE = (
+    ("vermelho", (255, 0, 0)),
+    ("laranja", (255, 80, 0)),
+    ("amarelo", (255, 200, 0)),
+    ("verde", (0, 255, 0)),
+    ("ciano", (0, 255, 255)),
+    ("azul", (0, 0, 255)),
+    ("roxo", (140, 0, 255)),
+    ("rosa", (255, 0, 120)),
+    ("branco", (255, 255, 255)),
+    ("verde-limão", (120, 255, 0)),
+    ("azul-claro", (0, 120, 255)),
+    ("magenta", (255, 0, 255)),
+)
+
+
+def palette_colors(n):
+    return [CHECK_PALETTE[i % len(CHECK_PALETTE)][1] for i in range(n)]
+
+
+def light_first(c, z, n, colors=None):
+    """Acende os primeiros n LEDs (branco, ou as cores dadas) e apaga o resto do chip."""
+    if n > c.chip_led_count(z):
+        c.set_chip_led_count(z, n)
+    lit = colors or [(255, 255, 255)] * n
+    c.set_colors(z, lit + [(0, 0, 0)] * (c.chip_led_count(z) - n))
+
+
+def cmd_count(devs, a):
+    board, (z,) = board_argb(a.zone, devs)
+    light_first(board, z, a.n)
+
+
+def cmd_check(devs, a):
+    """Uma cor diferente por LED até o número calibrado; o resto apagado."""
+    board, targets = board_argb(a.zone, devs)
+    for z in targets:
+        if a.leds:
+            board.set_led_count(z, a.leds)
+        n = board.led_count(z)
+        light_first(board, z, n, palette_colors(n))
+        legend = ", ".join(f"{i + 1} {CHECK_PALETTE[i % len(CHECK_PALETTE)][0]}" for i in range(n))
+        print(f"{z.name}: {n} LEDs -> {legend}")
+
+
+def ask_yes(question):
+    while True:
+        try:
+            answer = input(f"{question} [s/n] ").strip().lower()
+        except EOFError:
+            raise ValueError("calibrate é interativo: rode num terminal") from None
+        if answer in ("s", "sim", "y", "yes"):
+            return True
+        if answer in ("n", "nao", "não", "no"):
+            return False
+
+
+CALIBRATE_MAX = p.LED_COUNT_STEPS[2]  # 256: limite dos headers do IT57xx
+
+
+def cmd_calibrate(devs, a):
+    """Busca binária guiada pelo menor N que acende todos os LEDs; salva o resultado.
+
+    Funciona com fans em cadeia (N = soma dos LEDs) e em splitter/hub paralelo
+    (N = LEDs da fan com mais LEDs), sem depender de marca ou modelo.
+    """
+    c, (z,) = board_argb(a.zone, devs)
+    # cores distintas: com tudo branco, o brilho vaza pelo difusor e esconde
+    # LEDs apagados (deu 10 para fans de 12 LEDs na B550M AORUS ELITE)
+    light_first(c, z, CALIBRATE_MAX, palette_colors(CALIBRATE_MAX))
+    if not ask_yes(f"{z.name}: com {CALIBRATE_MAX} LEDs, todos os LEDs de todas as fans estão acesos?"):
+        raise ValueError(f"{z.name}: nem todos acendem com {CALIBRATE_MAX} LEDs; confira os cabos")
+    lo, hi = 1, CALIBRATE_MAX
+    while lo < hi:
+        mid = (lo + hi) // 2
+        light_first(c, z, mid, palette_colors(mid))
+        if ask_yes(f"{z.name}: [{mid} LEDs] todos os LEDs de todas as fans estão acesos (nenhum apagado)?"):
+            hi = mid
+        else:
+            lo = mid + 1
+    c.set_chip_led_count(z, lo)
+    c.config.set_leds(z.name, lo)
+    light_first(c, z, lo, palette_colors(lo))
+    print(f"{z.name}: {lo} LEDs, salvo em {c.config.path} (confira: uma cor por LED, nenhum apagado)")
 
 
 def build_parser():
@@ -152,12 +264,26 @@ def build_parser():
     s.add_argument("--speed", type=int, default=5, help=f"0-{p.SPEED_MAX}")
     s.set_defaults(fn=cmd_effect)
 
-    s = sub.add_parser("rainbow", help="arco-íris animado (Ctrl+C para sair)")
+    s = sub.add_parser("rainbow", help="onda de arco-íris gerada pelo PC (Ctrl+C para sair)")
     s.add_argument("zone", choices=ANIMATABLE)
     s.add_argument("--leds", type=int)
-    s.add_argument("--speed", type=float, default=5)
+    s.add_argument("--speed", type=float, default=5, help="0 = arco-íris estático (pinta uma vez e sai)")
     s.add_argument("--brightness", type=int, default=255)
     s.set_defaults(fn=cmd_rainbow)
+
+    s = sub.add_parser("count", help="acende os primeiros N LEDs em branco, para contar a faixa")
+    s.add_argument("zone", choices=ARGB_CHOICES)
+    s.add_argument("n", type=int, choices=range(1, CALIBRATE_MAX + 1), metavar="N", help=f"1-{CALIBRATE_MAX}")
+    s.set_defaults(fn=cmd_count)
+
+    s = sub.add_parser("check", help="uma cor diferente por LED, para conferir a calibração")
+    s.add_argument("zone", choices=[*ARGB_CHOICES, "all"])
+    s.add_argument("--leds", type=int, help="testa outra quantidade sem mudar a calibração")
+    s.set_defaults(fn=cmd_check)
+
+    s = sub.add_parser("calibrate", help="descobre e salva quantos LEDs um header ARGB tem (interativo)")
+    s.add_argument("zone", choices=ARGB_CHOICES)
+    s.set_defaults(fn=cmd_calibrate)
 
     s = sub.add_parser("off", help="apaga uma zona")
     s.add_argument("zone", choices=ZONE_CHOICES, nargs="?", default="all")

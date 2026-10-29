@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 from . import protocol as p
+from .config import Config
 
 VID, PID = 0x048D, 0x5702
 
@@ -111,9 +112,12 @@ class MemoryState(State):
 
 
 class Controller:
-    def __init__(self, transport=None, state=None):
+    def __init__(self, transport=None, state=None, config=None):
         self.transport = transport or HidrawTransport()
         self.state = state if state is not None else State()
+        self.config = config if config is not None else Config()
+        self._leds = {}  # --leds desta execução, por zona
+        self._pending = 0  # zonas com efeito enviado e ainda não aplicado
         self.transport.send(p.command(p.CMD_INFO, 0x00))
         self.info = p.parse_info(self.transport.get())
         if not self.state.board_initialized:
@@ -122,7 +126,7 @@ class Controller:
     def _initialize(self):
         """Limpa o estado deixado por outro software (ex.: RGB Fusion no Windows).
 
-        Sem isso, os efeitos animados (pulse, cycle, wave, random) não
+        Sem isso, os efeitos animados (pulse, cycle, random) não
         acendiam os headers ARGB na B550M AORUS ELITE, enquanto static e
         flash funcionavam. Roda uma vez por boot, porque zerar os efeitos a
         cada comando desfaria as cores das outras zonas.
@@ -157,15 +161,27 @@ class Controller:
         time.sleep(0.05)
 
     def led_count(self, zone):
+        """LEDs reais da zona: --leds desta execução, calibração salva ou o chip."""
+        return self._leds.get(zone.name) or self.config.leds(zone.name) or self.chip_led_count(zone)
+
+    def chip_led_count(self, zone):
+        """Capacidade configurada no chip (degraus de 32, 64, 256...)."""
         return self.info.argb_counts[zone.cal_slot]
 
-    def set_led_count(self, zone, count):
+    def set_chip_led_count(self, zone, count):
+        """Ajusta a capacidade do chip ao menor degrau que comporta `count`."""
         counts = list(self.info.argb_counts)
         counts[zone.cal_slot] = p.LED_COUNT_STEPS[p.led_count_code(count)]
         if tuple(counts) == self.info.argb_counts:
             return
         self.transport.send(p.led_count_packet(counts))
         self.info = dataclasses.replace(self.info, argb_counts=tuple(counts))
+
+    def set_led_count(self, zone, count):
+        """Usa `count` LEDs nesta execução, sem salvar."""
+        if count > self.chip_led_count(zone):
+            self.set_chip_led_count(zone, count)
+        self._leds[zone.name] = count
 
     # --- operações por zona ---------------------------------------------
     def set_colors(self, zone, colors):
@@ -187,11 +203,15 @@ class Controller:
         if zone.addressable:
             self._set_builtin(zone, True)
         self.transport.send(p.effect_packet(zone, effect, color, brightness, speed))
+        self._pending |= 1 << zone.index
         if apply:
             self.apply()
 
     def apply(self):
-        self.transport.send(p.apply_packet())
+        """Aplica só as zonas alteradas desde o último apply."""
+        if self._pending:
+            self.transport.send(p.apply_packet(self._pending))
+            self._pending = 0
 
     def off(self, zone):
         if zone.addressable:
