@@ -1,0 +1,2 @@
+# ITE IT5702 (RGB Fusion 2.0) - acesso para o usuário logado
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="5702", TAG+="uaccess", MODE="0660"
