@@ -56,12 +56,35 @@ Necessário só para as zonas `dram*` (branch `feat/dram-smbus`):
 Zonas: `d_led1`, `d_led2` (ARGB), `led_c1`, `led_cpu`, `led_c2` (RGB),
 `dram1`, `dram2` (cada pente), `dram` (todos os pentes) ou `all`.
 
-    aorus-rgb info                              # controlador e zonas
+    aorus-rgb info                              # controladores, zonas e calibração
     aorus-rgb color d_led1 ff0000               # cor fixa
-    aorus-rgb color d_led1 ff0000 --leds 60     # ajusta o tamanho do strip
     aorus-rgb effect all pulse 00ff00 --speed 3 # efeito de hardware (speed 0-9)
-    aorus-rgb rainbow d_led2                    # animação por software (Ctrl+C)
+    aorus-rgb rainbow all                       # onda de arco-íris por software (Ctrl+C)
+    aorus-rgb rainbow all --speed 0             # arco-íris estático (pinta e sai)
     aorus-rgb color dram ff0000                 # memórias
     aorus-rgb off                               # apaga tudo (ou: off led_c1)
 
-Efeitos: `static`, `pulse`, `flash`, `cycle`, `wave`, `random`.
+Efeitos de hardware: `static`, `pulse`, `flash`, `cycle`, `random`.
+
+## Calibração dos headers ARGB (uma vez)
+A placa não sabe quantos LEDs estão ligados em cada header. Calibre uma vez por
+header, num terminal interativo, olhando as fans:
+
+    aorus-rgb calibrate d_led1   # responde s/n; salva em ~/.config/aorus-rgb/config.json
+    aorus-rgb check all          # uma cor por LED: confira que nenhum LED fica apagado
+
+Funciona com fans em cadeia (soma dos LEDs) ou em splitter/hub (LEDs da maior
+fan), de qualquer marca. Ferramentas auxiliares:
+
+    aorus-rgb check d_led1 --leds 24   # testa outra quantidade sem salvar
+    aorus-rgb count d_led1 12          # acende os primeiros 12 LEDs em branco
+    aorus-rgb color d_led1 ff0000 --leds 60  # usa 60 LEDs só nesta execução
+
+## Estado e configuração
+| Arquivo | Conteúdo | Validade |
+|---------|----------|----------|
+| `~/.config/aorus-rgb/config.json` | LEDs calibrados por header | permanente |
+| `~/.local/state/aorus-rgb/state.json` | máscara `0x32` e inicialização da placa | boot atual |
+
+No primeiro comando de cada boot, a placa é inicializada (efeitos zerados e
+modo beat desligado), para limpar o estado deixado por outro software.
