@@ -30,7 +30,10 @@ REG_I2C_ADDRESS = 0x80F9
 
 CONFIG_LED_COUNT = 0x02
 APPLY_VAL = 0x01
-BLOCK_SIZE = 3
+# O OpenRGB escreve 3 bytes por bloco; o chip aceita o pente inteiro de uma vez
+# (testado com 24 bytes = 8 LEDs nas Asgard, conferido lendo de volta), o que
+# derruba um quadro de 12 ms para 3,5 ms por pente.
+BLOCK_SIZE = 24
 
 # versão do chip -> (registrador de cores diretas, de cores de efeito)
 SUPPORTED = {"AUDA0-E6K5-0101": (0x8100, 0x8160)}

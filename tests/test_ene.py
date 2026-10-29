@@ -51,13 +51,20 @@ def test_discover_skips_unsupported_versions():
     assert ene.discover(bus) == []
 
 
-def test_direct_colors_use_rbg_order_in_3_byte_blocks():
+def test_direct_colors_use_rbg_order_in_one_block_per_stick():
     bus = FakeSMBus([FakeEne(0, led_count=2)])
     (dev,) = ene.discover(bus)
     dev.set_colors([(1, 2, 3), (4, 5, 6)])
     assert bus.chips[0].colors(0x8100, 2) == [1, 3, 2, 4, 6, 5]
     blocks = [e for e in bus.log if e[0] == "block"]
-    assert [len(e[3]) for e in blocks] == [3, 3]
+    assert [len(e[3]) for e in blocks] == [6]
+
+
+def test_eight_leds_fit_in_a_single_block():
+    bus = FakeSMBus([FakeEne(0, led_count=8)])
+    (dev,) = ene.discover(bus)
+    dev.set_colors([(i, i, i) for i in range(8)])
+    assert [len(e[3]) for e in bus.log if e[0] == "block"] == [24]
 
 
 def test_block_write_falls_back_to_bytes():
