@@ -63,11 +63,15 @@ def _boot_id():
 
 
 class State:
-    """Estado que o chip não informa (máscara do comando 0x32).
+    """Estado que o chip não informa, válido só para o boot atual.
 
-    Sem isso, cada execução da CLI começaria com a máscara zerada e religaria
-    o efeito embutido dos outros headers. O estado vale só para o boot atual:
-    ao ligar o PC o chip volta ao padrão, então o arquivo é descartado.
+    - builtin_off_mask: máscara do comando 0x32. Sem ela, cada execução da CLI
+      começaria com a máscara zerada e religaria o efeito embutido dos outros
+      headers.
+    - board_initialized: se a placa já foi inicializada neste boot (ver
+      Controller._initialize).
+
+    Ao ligar o PC o chip volta ao padrão, então o arquivo é descartado.
     """
 
     def __init__(self, path=None):
@@ -76,16 +80,22 @@ class State:
             path = Path(base) / "aorus-rgb" / "state.json"
         self.path = Path(path)
         self.builtin_off_mask = 0
+        self.board_initialized = False
         try:
             data = json.loads(self.path.read_text())
             if data.get("boot_id") == _boot_id():
                 self.builtin_off_mask = int(data.get("builtin_off_mask", 0))
+                self.board_initialized = bool(data.get("board_initialized", False))
         except (OSError, ValueError):
             pass
 
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        data = {"boot_id": _boot_id(), "builtin_off_mask": self.builtin_off_mask}
+        data = {
+            "boot_id": _boot_id(),
+            "builtin_off_mask": self.builtin_off_mask,
+            "board_initialized": self.board_initialized,
+        }
         self.path.write_text(json.dumps(data))
 
 
@@ -94,6 +104,7 @@ class MemoryState(State):
 
     def __init__(self):
         self.builtin_off_mask = 0
+        self.board_initialized = False
 
     def save(self):
         pass
@@ -105,6 +116,22 @@ class Controller:
         self.state = state if state is not None else State()
         self.transport.send(p.command(p.CMD_INFO, 0x00))
         self.info = p.parse_info(self.transport.get())
+        if not self.state.board_initialized:
+            self._initialize()
+
+    def _initialize(self):
+        """Limpa o estado deixado por outro software (ex.: RGB Fusion no Windows).
+
+        Sem isso, os efeitos animados (pulse, cycle, wave, random) não
+        acendiam os headers ARGB na B550M AORUS ELITE, enquanto static e
+        flash funcionavam. Roda uma vez por boot, porque zerar os efeitos a
+        cada comando desfaria as cores das outras zonas.
+        """
+        for packet in p.reset_packets():
+            self.transport.send(packet)
+        self.transport.send(p.beat_packet(False))
+        self.state.board_initialized = True
+        self.state.save()
 
     @property
     def path(self):

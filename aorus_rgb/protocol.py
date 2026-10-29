@@ -13,6 +13,7 @@ PACKET_SIZE = 64
 
 CMD_EFFECT_BASE = 0x20       # 0x20 + índice da zona
 CMD_APPLY = 0x28
+CMD_BEAT = 0x31             # efeitos sincronizados com áudio
 CMD_BUILTIN_EFFECT_OFF = 0x32
 CMD_LED_COUNT = 0x34
 CMD_INFO = 0x60
@@ -134,6 +135,15 @@ def builtin_effect_off_packet(mask):
 
 def apply_packet():
     return command(CMD_APPLY, 0xFF, 0x00)
+
+
+def beat_packet(enabled):
+    return command(CMD_BEAT, 1 if enabled else 0)
+
+
+def reset_packets():
+    """Zera os efeitos de todas as zonas, como o OpenRGB faz ao iniciar."""
+    return [command(CMD_EFFECT_BASE + i, 0x00, 0x00) for i in range(8)] + [apply_packet()]
 
 
 def _timings(effect, speed):
