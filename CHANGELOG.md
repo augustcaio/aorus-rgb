@@ -8,5 +8,15 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 
 ### Added
 - `feat/driver-it5702`: driver USB HID para o controlador ITE IT5702
-  (RGB Fusion 2.0), CLI (`info`, `static`, `rainbow`, `effect`, `off`),
-  regra udev e `pyproject.toml` com extras de desenvolvimento.
+  (RGB Fusion 2.0), regra udev e `pyproject.toml` com extras de desenvolvimento.
+- Controle por zona: `d_led1`, `d_led2`, `led_c1`, `led_cpu`, `led_c2` e `all`.
+- CLI: `info`, `color`, `effect`, `rainbow`, `off`.
+- Efeitos de hardware `wave` e `random`, velocidade 0-9 e brilho 0-255 validados.
+- Testes unitários (50) com fixture capturada do hardware real.
+
+### Changed
+- **Quebra:** `static COR --header N` virou `color d_ledN COR`, e `effect`
+  recebe a zona como primeiro argumento.
+
+### Fixed
+- Definir cor em um header ARGB religava o efeito embutido do outro.
