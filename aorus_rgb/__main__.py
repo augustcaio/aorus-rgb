@@ -6,7 +6,7 @@ from contextlib import ExitStack
 
 from . import protocol as p
 from .device import Controller, DeviceNotFound
-from .dram import DramController
+from .dram import DramController, DramZone
 from .smbus import BusNotFound, ForbiddenAddress
 
 DRAM_SLOTS = [f"dram{i}" for i in range(1, 5)]
@@ -133,8 +133,17 @@ def rainbow_frame(n, t, value):
     return [tuple(int(x * 255) for x in colorsys.hsv_to_rgb((t + i / n) % 1, 1, value)) for i in range(n)]
 
 
+RAINBOW_FPS = 30
+
+
 def cmd_rainbow(devs, a):
-    """Onda de arco-íris gerada pelo PC; com `all`, headers ARGB e memórias juntos."""
+    """Onda de arco-íris; com `all`, headers ARGB e memórias juntos.
+
+    Estático (--speed 0): o PC pinta tudo uma vez. Animado: os headers ARGB
+    são animados pelo PC (USB, ~9 ms por quadro) e as memórias usam o rainbow
+    do próprio chip ENE. Animá-las pelo PC ocuparia o SMBus em ~36% do tempo,
+    disputando o barramento com o BIOS (acpi_enforce_resources=lax).
+    """
     targets = [(ctl, z) for ctl, z in resolve(a.zone, devs) if z.addressable]
     if a.leds:
         for ctl, z in targets:
@@ -146,13 +155,21 @@ def cmd_rainbow(devs, a):
         for ctl, z in targets:
             ctl.set_colors(z, rainbow_frame(ctl.led_count(z), 0.0, v))
         return
+    for ctl, z in targets:
+        if isinstance(z, DramZone):
+            ctl.set_rainbow(z, a.speed)
+    animated = [(ctl, z) for ctl, z in targets if not isinstance(z, DramZone)]
+    if not animated:
+        return
     t = 0.0
+    deadline = time.monotonic()
     try:
         while True:
-            for ctl, z in targets:
+            for ctl, z in animated:
                 ctl.set_colors(z, rainbow_frame(ctl.led_count(z), t, v))
             t = (t + a.speed / 1000) % 1
-            time.sleep(1 / 30)
+            deadline += 1 / RAINBOW_FPS
+            time.sleep(max(0.0, deadline - time.monotonic()))
     except KeyboardInterrupt:
         pass
 

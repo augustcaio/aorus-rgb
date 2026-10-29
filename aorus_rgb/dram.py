@@ -32,6 +32,11 @@ def ene_speed(speed):
     return round(speed * ene.SPEED_SLOWEST / SPEED_MAX)
 
 
+def rainbow_speed(speed):
+    """Velocidade do `rainbow` da CLI (maior = mais rápido) -> ENE (0 rápido .. 4 lento)."""
+    return min(ene.SPEED_SLOWEST, max(ene.SPEED_FASTEST, round(ene.SPEED_SLOWEST - speed * ene.SPEED_SLOWEST / 10)))
+
+
 def _dim(color, brightness):
     if not 0 <= brightness <= 255:
         raise ValueError("brilho deve estar entre 0 e 255")
@@ -74,6 +79,11 @@ class DramController:
             raise ValueError(f"efeito desconhecido: {effect}")
         colors = [_dim(color, brightness)] * self.led_count(zone)
         zone.device.set_mode(EFFECT_TO_MODE[effect], colors, ene_speed(speed))
+        self._direct.discard(zone.name)
+
+    def set_rainbow(self, zone, speed=5):
+        """Rainbow animado pelo próprio chip, sem tráfego no SMBus depois de ligado."""
+        zone.device.set_mode("rainbow", [(0, 0, 0)] * self.led_count(zone), rainbow_speed(speed))
         self._direct.discard(zone.name)
 
     def apply(self):

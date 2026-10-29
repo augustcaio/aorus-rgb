@@ -1,9 +1,11 @@
 import argparse
+import time
 from contextlib import ExitStack
 
 import pytest
 from fake_smbus import FakeEne, FakeSMBus
 
+from aorus_rgb import ene
 from aorus_rgb import protocol as p
 from aorus_rgb.__main__ import (
     CHECK_PALETTE,
@@ -17,7 +19,7 @@ from aorus_rgb.__main__ import (
     rainbow_frame,
     resolve,
 )
-from aorus_rgb.dram import DramController
+from aorus_rgb.dram import DramController, rainbow_speed
 
 
 def devices(board, dram=None):
@@ -190,3 +192,40 @@ def test_calibrate_needs_an_interactive_terminal(controller, monkeypatch):
     monkeypatch.setattr("builtins.input", no_stdin)
     with pytest.raises(ValueError, match="terminal"):
         run(cmd_calibrate, controller, "calibrate", "d_led1")
+
+
+# --- rainbow animado ------------------------------------------------------
+
+def stop_after_first_frame(monkeypatch):
+    """Simula Ctrl+C na pausa entre quadros, só no laço da CLI."""
+
+    class Clock:
+        monotonic = staticmethod(time.monotonic)
+
+        @staticmethod
+        def sleep(seconds):
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr("aorus_rgb.__main__.time", Clock)
+
+
+def test_animated_rainbow_runs_memory_on_chip_and_board_from_pc(controller, transport, monkeypatch):
+    stop_after_first_frame(monkeypatch)
+    bus = FakeSMBus([FakeEne(1, led_count=8), FakeEne(3, led_count=8)])
+    run(cmd_rainbow, controller, "rainbow", "all", dram=DramController(bus))
+    for chip in bus.chips:
+        assert chip.regs[ene.REG_MODE] == ene.MODES["rainbow"]
+        assert chip.regs[ene.REG_DIRECT] == 0
+        assert chip.colors(0x8100, 8) == [0] * 24  # nenhuma cor direta pelo SMBus
+    assert {pkt[1] for pkt in transport.sent} >= {0x58, 0x59}  # placa animada pelo PC
+
+
+def test_animated_rainbow_on_memory_only_returns_immediately(controller):
+    bus = FakeSMBus([FakeEne(1)])
+    run(cmd_rainbow, controller, "rainbow", "dram", dram=DramController(bus))  # sem laço
+    assert bus.chips[0].regs[ene.REG_MODE] == ene.MODES["rainbow"]
+
+
+@pytest.mark.parametrize("speed, expected", [(1, 4), (5, 2), (10, 0), (50, 0)])
+def test_rainbow_speed_maps_to_ene(speed, expected):
+    assert rainbow_speed(speed) == expected
