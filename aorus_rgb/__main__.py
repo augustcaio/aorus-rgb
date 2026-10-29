@@ -58,21 +58,41 @@ def cmd_off(c, a):
         c.off(z)
 
 
+def rainbow_frame(n, t, value):
+    """Arco-íris de n LEDs com fase t (0-1)."""
+    return [tuple(int(x * 255) for x in colorsys.hsv_to_rgb((t + i / n) % 1, 1, value)) for i in range(n)]
+
+
 def cmd_rainbow(c, a):
-    z = p.ZONES[a.zone]
+    """Onda de arco-íris gerada pelo PC; com `all`, todos os headers ARGB juntos."""
+    targets = [z for z in zones(a.zone) if z.addressable]
     if a.leds:
-        c.set_led_count(z, a.leds)
-    n = c.led_count(z)
+        for z in targets:
+            c.set_led_count(z, a.leds)
     v = a.brightness / 255
+    if a.speed == 0:
+        # gradiente fixo: as cores diretas ficam no chip depois que o comando sai
+        for z in targets:
+            c.set_colors(z, rainbow_frame(c.led_count(z), 0.0, v))
+        return
     t = 0.0
     try:
         while True:
-            frame = [tuple(int(x * 255) for x in colorsys.hsv_to_rgb((t + i / n) % 1, 1, v)) for i in range(n)]
-            c.set_colors(z, frame)
+            for z in targets:
+                c.set_colors(z, rainbow_frame(c.led_count(z), t, v))
             t = (t + a.speed / 1000) % 1
             time.sleep(1 / 30)
     except KeyboardInterrupt:
         pass
+
+
+def cmd_count(c, a):
+    """Acende os primeiros N LEDs em branco e apaga o resto, para contar a faixa."""
+    z = p.ZONES[a.zone]
+    if a.n > c.led_count(z):
+        c.set_led_count(z, a.n)
+    total = c.led_count(z)
+    c.set_colors(z, [(255, 255, 255)] * a.n + [(0, 0, 0)] * (total - a.n))
 
 
 def build_parser():
@@ -95,12 +115,18 @@ def build_parser():
     s.add_argument("--speed", type=int, default=5, help=f"0-{p.SPEED_MAX}")
     s.set_defaults(fn=cmd_effect)
 
-    s = sub.add_parser("rainbow", help="arco-íris animado num strip ARGB (Ctrl+C para sair)")
-    s.add_argument("zone", choices=ARGB_CHOICES)
+    s = sub.add_parser("rainbow", help="onda de arco-íris gerada pelo PC (Ctrl+C para sair)")
+    s.add_argument("zone", choices=[*ARGB_CHOICES, "all"])
     s.add_argument("--leds", type=int)
-    s.add_argument("--speed", type=float, default=5)
+    s.add_argument("--speed", type=float, default=5, help="0 = arco-íris estático (pinta uma vez e sai)")
     s.add_argument("--brightness", type=int, default=255)
     s.set_defaults(fn=cmd_rainbow)
+
+    s = sub.add_parser("count", help="acende os primeiros N LEDs em branco, para contar a faixa")
+    s.add_argument("zone", choices=ARGB_CHOICES)
+    s.add_argument("n", type=int, choices=range(1, p.LED_COUNT_STEPS[2] + 1), metavar="N",
+                   help=f"1-{p.LED_COUNT_STEPS[2]}")
+    s.set_defaults(fn=cmd_count)
 
     s = sub.add_parser("off", help="apaga uma zona")
     s.add_argument("zone", choices=ZONE_CHOICES, nargs="?", default="all")
