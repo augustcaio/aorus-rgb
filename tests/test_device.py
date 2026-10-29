@@ -99,3 +99,20 @@ def test_state_ignores_corrupt_file(tmp_path):
     path = tmp_path / "state.json"
     path.write_text("{oops")
     assert State(path).builtin_off_mask == 0
+
+
+def apply_masks(transport):
+    return [pkt[2] for pkt in transport.sent if pkt[1] == p.CMD_APPLY]
+
+
+def test_apply_only_touches_changed_zones(controller, transport):
+    """Regressão: aplicar sempre 0xFF reaplicava sobras do 0x20 e apagava a placa."""
+    for z in (D_LED1, D_LED2, LED_C1):
+        controller.set_effect(z, "pulse", (255, 0, 255), apply=False)
+    controller.apply()
+    assert apply_masks(transport) == [(1 << 5) | (1 << 6) | (1 << 1)]
+
+
+def test_apply_without_pending_changes_sends_nothing(controller, transport):
+    controller.apply()
+    assert transport.sent == []

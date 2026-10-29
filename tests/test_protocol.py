@@ -80,8 +80,6 @@ def test_effect_on_rgb_header():
         ("flash", 5, (100, 100, 1700, 0), (0, 0, 0, 0)),
         ("cycle", 5, (800, 600, 0, 0), (7, 0, 0, 0)),
         ("cycle", 9, (2500, 2300, 0, 0), (7, 0, 0, 0)),
-        ("wave", 0, (30, 0, 0, 0), (7, 1, 0, 0)),
-        ("wave", 9, (300, 0, 0, 0), (7, 1, 0, 0)),
         ("random", 5, (100, 0, 0, 0), (1, 5, 0, 0)),
     ],
 )
@@ -132,3 +130,19 @@ def test_pulse_brightness_is_capped_at_100(brightness, expected):
 
 def test_other_effects_keep_full_brightness():
     assert p.effect_packet(D_LED1, "static", (255, 0, 255), brightness=255)[12] == 255
+
+
+def test_hardware_wave_is_not_exposed():
+    """O wave de hardware apaga os headers ARGB na B550M AORUS ELITE."""
+    assert "wave" not in p.EFFECTS
+
+
+def test_apply_packet_carries_zone_mask():
+    pkt = p.apply_packet(0b0110_0010)
+    assert pkt[1] == 0x28
+    assert struct.unpack_from("<II", pkt, 2) == (0x62, 0)
+
+
+def test_default_apply_is_the_full_apply_used_by_reset():
+    assert p.apply_packet() == p.command(0x28, 0xFF, 0x00)
+    assert p.reset_packets()[-1] == p.apply_packet(0xFF)

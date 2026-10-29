@@ -18,6 +18,8 @@ CMD_BUILTIN_EFFECT_OFF = 0x32
 CMD_LED_COUNT = 0x34
 CMD_INFO = 0x60
 
+ALL_ZONES_MASK = 0xFF        # máscara de zonas: todas as 8
+
 ARGB_LEDS_PER_PACKET = 19
 LED_COUNT_STEPS = (32, 64, 256, 512, 1024)  # índice = código enviado ao chip
 SPEED_MAX = 9
@@ -32,9 +34,12 @@ EFFECTS = {
     "pulse": 2,
     "flash": 3,
     "cycle": 4,
-    "wave": 6,
     "random": 8,
 }
+# O wave de hardware (6) não é exposto: na B550M AORUS ELITE ele exige a
+# sequência "placa inteira" do OpenRGB (todas as zonas em estático no 0x20 +
+# wave no slot 2), e esse estado apaga os headers ARGB até um reset. A onda
+# de arco-íris é feita por software no comando `rainbow`.
 
 
 @dataclass(frozen=True)
@@ -133,8 +138,16 @@ def builtin_effect_off_packet(mask):
     return command(CMD_BUILTIN_EFFECT_OFF, mask)
 
 
-def apply_packet():
-    return command(CMD_APPLY, 0xFF, 0x00)
+def apply_packet(mask=ALL_ZONES_MASK):
+    """Aplica os efeitos pendentes das zonas na máscara (struct PktEffectApply).
+
+    Um registrador cuja zona está na máscara é reaplicado mesmo sem ter
+    mudado. Aplicar sempre 0xFF reaplicaria também sobras deixadas por outro
+    software, como um efeito "todas as zonas" no 0x20, por cima do efeito novo.
+    """
+    buf = bytearray(command(CMD_APPLY))
+    struct.pack_into("<II", buf, 2, mask, 0)
+    return bytes(buf)
 
 
 def beat_packet(enabled):
@@ -158,9 +171,6 @@ def _timings(effect, speed):
         p[0] = speed * 100 + 300 + (1300 * (speed - 8) if speed > 8 else 0)
         p[1] = p[0] - 200
         a[0] = 7
-    elif effect == "wave":
-        p[0] = ((speed + 1) ** 2 + (speed + 1) + 10) * 5 // 2
-        a[0], a[1] = 7, 1
     elif effect == "random":
         p[0] = 100
         a[0], a[1] = 1, 5
