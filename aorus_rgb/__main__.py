@@ -1,14 +1,15 @@
 import argparse
 import colorsys
+import os
 import sys
 import time
 from contextlib import ExitStack
 
 from . import protocol as p
 from .config import Config
-from .device import Controller, DeviceNotFound
+from .device import Controller, DeviceNotFound, find_hidraw
 from .dram import DramController, DramZone
-from .smbus import BusNotFound, ForbiddenAddress
+from .smbus import BusNotFound, ForbiddenAddress, find_dram_bus
 
 DRAM_SLOTS = [f"dram{i}" for i in range(1, 5)]
 ZONE_CHOICES = [*p.ZONES, *DRAM_SLOTS, "dram", "all"]
@@ -284,8 +285,43 @@ def cmd_profile(devs, a):
     print(f"perfil salvo: {' '.join(a.command)}")
 
 
+RUN_WAIT_SECONDS = 15
+
+
+def wait_for_device_access(timeout=RUN_WAIT_SECONDS, poll=0.25):
+    """Espera a placa e o SMBus das memórias ficarem acessíveis; devolve o que faltou.
+
+    No login, o serviço pode iniciar antes de o logind aplicar a ACL da regra
+    udev (uaccess): a primeira tentativa falhava com "sem permissão". Esperar
+    pelos dois evita também começar o `rainbow all` sem as memórias.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        pending = []
+        try:
+            board = find_hidraw()
+        except DeviceNotFound:
+            pending.append("placa (ainda não detectada)")
+        else:
+            if not os.access(board, os.R_OK | os.W_OK):
+                pending.append(board)
+        try:
+            bus = find_dram_bus()
+        except BusNotFound:
+            pass  # sem SMBus (ex.: sem i2c-dev): segue sem as memórias
+        else:
+            if not os.access(bus, os.R_OK | os.W_OK):
+                pending.append(bus)
+        if not pending or time.monotonic() >= deadline:
+            return pending
+        time.sleep(poll)
+
+
 def cmd_run(devs, a):
     """Aplica o perfil salvo (é o que o serviço do systemd executa)."""
+    pending = wait_for_device_access()
+    if pending:
+        warn(f"sem acesso após {RUN_WAIT_SECONDS}s: {', '.join(pending)}")
     argv = Config().profile() or DEFAULT_PROFILE
     profile = build_parser().parse_args(argv)
     profile.fn(devs, profile)

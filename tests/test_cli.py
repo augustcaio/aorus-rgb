@@ -20,9 +20,12 @@ from aorus_rgb.__main__ import (
     parse_color,
     rainbow_frame,
     resolve,
+    wait_for_device_access,
 )
 from aorus_rgb.config import Config
+from aorus_rgb.device import DeviceNotFound
 from aorus_rgb.dram import DramController
+from aorus_rgb.smbus import BusNotFound
 
 
 def devices(board, dram=None):
@@ -266,14 +269,78 @@ def test_profile_without_arguments_shows_the_default(capsys):
     assert "padrão: rainbow all" in capsys.readouterr().out
 
 
-def test_run_applies_the_saved_profile(controller, transport):
+@pytest.fixture
+def devices_ready(monkeypatch):
+    monkeypatch.setattr("aorus_rgb.__main__.wait_for_device_access", list)
+
+
+def test_run_applies_the_saved_profile(controller, transport, devices_ready):
     Config().set_profile(["color", "d_led1", "ff0000"])
     controller.config = Config()
     run(cmd_run, controller, "run")
     assert [pkt[1] for pkt in transport.sent if pkt[1] in (0x58, 0x59)] == [0x58, 0x58]
 
 
-def test_run_without_profile_uses_the_rainbow(controller, transport, monkeypatch):
+def test_run_without_profile_uses_the_rainbow(controller, transport, monkeypatch, devices_ready):
     stop_after_first_frame(monkeypatch)
     run(cmd_run, controller, "run")
     assert {pkt[1] for pkt in transport.sent} >= {0x58, 0x59}
+
+
+# --- espera pela permissão no login ---------------------------------------
+
+class FakeClock:
+    """Relógio simulado: cada sleep avança o tempo, sem esperar de verdade."""
+
+    def __init__(self):
+        self.now = 0.0
+        self.sleeps = 0
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.sleeps += 1
+        self.now += seconds
+
+
+def fake_devices(monkeypatch, board="/dev/hidraw5", bus="/dev/i2c-0", granted_after=0):
+    clock = FakeClock()
+    monkeypatch.setattr("aorus_rgb.__main__.time", clock)
+
+    def find_board():
+        if board is None:
+            raise DeviceNotFound("sem placa")
+        return board
+
+    def find_bus():
+        if bus is None:
+            raise BusNotFound("sem SMBus")
+        return bus
+
+    monkeypatch.setattr("aorus_rgb.__main__.find_hidraw", find_board)
+    monkeypatch.setattr("aorus_rgb.__main__.find_dram_bus", find_bus)
+    monkeypatch.setattr("aorus_rgb.__main__.os.access", lambda path, mode: clock.sleeps >= granted_after)
+    return clock
+
+
+def test_wait_returns_as_soon_as_access_is_granted(monkeypatch):
+    clock = fake_devices(monkeypatch, granted_after=3)
+    assert wait_for_device_access() == []
+    assert clock.sleeps == 3
+
+
+def test_wait_gives_up_after_the_timeout(monkeypatch):
+    clock = fake_devices(monkeypatch, granted_after=10_000)
+    assert wait_for_device_access(timeout=2) == ["/dev/hidraw5", "/dev/i2c-0"]
+    assert clock.now >= 2
+
+
+def test_wait_ignores_a_missing_smbus(monkeypatch):
+    fake_devices(monkeypatch, bus=None)
+    assert wait_for_device_access() == []
+
+
+def test_wait_keeps_waiting_for_a_board_not_yet_detected(monkeypatch):
+    fake_devices(monkeypatch, board=None)
+    assert wait_for_device_access(timeout=1) == ["placa (ainda não detectada)"]
