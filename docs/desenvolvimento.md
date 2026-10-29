@@ -1,13 +1,14 @@
 # Desenvolvimento
 
-O código vive nas branches de feature (veja o [README](../README.md)). Estas
-instruções valem para a branch `feat/driver-it5702`.
+O código vive nas branches de feature (veja o [README](../README.md)). Para
+apenas usar o programa, instale o pacote da release (seção "Pacote" abaixo).
+As instruções de ambiente valem para qualquer branch de código.
 
 ## Ambiente
 O venv e os caches ficam fora do repositório, para que nenhuma branch
 acumule arquivos gerados (`.venv`, `__pycache__`, `*.egg-info`, `.ruff_cache`).
 
-    git switch feat/driver-it5702
+    git switch feat/packaging
     ./dev-setup.sh
     source ~/.venvs/aorus-rgb/bin/activate
     aorus-rgb info                # ou: python -m aorus_rgb info
@@ -109,6 +110,28 @@ automático do systemd fica como última garantia.
 Suspensão: o serviço continua rodando e retoma os quadros ao acordar. Durante a
 suspensão, o hub das fans DarkFlash mostra o próprio efeito (arco-íris girando)
 até a placa voltar a enviar dados.
+
+## Pacote
+O pacote do Arch instala o programa em `/usr/bin/aorus-rgb`, a regra udev em
+`/usr/lib/udev/rules.d`, o serviço em `/usr/lib/systemd/user` e o
+`i2c-dev` em `/usr/lib/modules-load.d`. Não altera o boot.
+
+    sudo pacman -U aorus-rgb-*.pkg.tar.zst
+    systemctl --user enable --now aorus-rgb
+
+Quem usava a instalação de desenvolvimento precisa removê-la antes, porque ela
+tem prioridade: `./install-service.sh --uninstall` e
+`sudo rm /etc/udev/rules.d/70-aorus-rgb.rules`. Calibração e perfil, em
+`~/.config/aorus-rgb`, continuam valendo.
+
+Gerar os artefatos de uma release, a partir do conteúdo exato da tag e fora da
+pasta do projeto (requer `base-devel python-build python-installer
+python-pytest`; `namcap` é opcional):
+
+    packaging/build.sh v1.1.0      # saída em ~/.cache/aorus-rgb/dist/v1.1.0
+
+O `namcap` acusa `aorus_rgb.__main__.main` como dependência não instalada:
+é falso positivo, porque `main` é uma função e o módulo está no próprio pacote.
 
 ## Estado e configuração
 | Arquivo | Conteúdo | Validade |
