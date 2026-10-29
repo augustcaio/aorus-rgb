@@ -1,2 +1,6 @@
 # ITE IT5702 (RGB Fusion 2.0) - acesso para o usuário logado
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="5702", TAG+="uaccess", MODE="0660"
+
+# SMBus da AMD onde ficam os slots de memória (controladores RGB ENE).
+# Só este barramento: a CLI bloqueia os endereços da SPD (0x30-0x37, 0x50-0x57).
+SUBSYSTEM=="i2c-dev", KERNEL=="i2c-[0-9]*", ATTR{name}=="SMBus PIIX4 adapter port 0 at 0b00", TAG+="uaccess"
