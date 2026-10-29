@@ -71,12 +71,29 @@ def test_off_rgb_header_uses_effect_none(controller, transport):
     assert transport.sent[0][11] == p.EFFECTS["none"]
 
 
-def test_set_led_count_only_sends_on_change(controller, transport):
+def test_set_led_count_grows_chip_capacity_only_when_needed(controller, transport):
     controller.set_led_count(D_LED1, 20)
     assert transport.sent == []
+    assert controller.led_count(D_LED1) == 20
     controller.set_led_count(D_LED1, 60)
     assert transport.commands() == [p.CMD_LED_COUNT]
-    assert controller.led_count(D_LED1) == 64
+    assert controller.chip_led_count(D_LED1) == 64
+    assert controller.led_count(D_LED1) == 60
+
+
+def test_led_count_precedence(controller):
+    assert controller.led_count(D_LED1) == 32  # padrão do chip
+    controller.config.set_leds("d_led1", 9)
+    assert controller.led_count(D_LED1) == 9  # calibração salva
+    controller.set_led_count(D_LED1, 12)
+    assert controller.led_count(D_LED1) == 12  # --leds desta execução
+
+
+def test_color_uses_calibrated_led_count(controller, transport):
+    controller.config.set_leds("d_led1", 9)
+    controller.set_color(D_LED1, (255, 0, 0))
+    (pkt,) = [pkt for pkt in transport.sent if pkt[1] == 0x58]
+    assert pkt[4] == 9 * 3
 
 
 def test_state_persists_within_same_boot(tmp_path, monkeypatch):

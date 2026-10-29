@@ -32,6 +32,13 @@ class FakeTransport:
         return [pkt[1] for pkt in self.sent]
 
 
+@pytest.fixture(autouse=True)
+def isolated_user_dirs(tmp_path, monkeypatch):
+    """Nenhum teste lê ou grava ~/.config ou ~/.local/state de verdade."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+
 @pytest.fixture
 def transport():
     return FakeTransport()
