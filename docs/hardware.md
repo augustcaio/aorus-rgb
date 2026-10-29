@@ -22,10 +22,16 @@ Layout `it5702_24` do OpenRGB, o mesmo usado pela B550M AORUS ELITE:
 ## Periféricos
 | Item | Ligação | Estado |
 |------|---------|--------|
-| Fans (grupo) | `d_led1` | controlados pelo driver; vermelho confirmado (ordem GRB correta) |
-| Water cooler Corsair H55 RGB, fan do radiador | ARGB da placa | aceso |
+| Grupo 1: 4 fans Aigo DarkFlash Infinity 24 Pro | `d_led1`, em splitter | 12 LEDs por fan; validado |
+| Grupo 2: 2 fans DarkFlash + fan do radiador do H55 RGB | `d_led2`, em splitter | 12 LEDs por fan; validado |
 | Water cooler Corsair H55 RGB, bomba | ARGB 3 pinos próprio | LEDs nunca acenderam; refrigeração funciona |
 | Memórias Asgard RGB (2 pentes) | SMBus, controlador ENE `AUDA0-E6K5-0101` em `0x77` | sempre no rainbow padrão; suporte em `feat/dram-smbus` |
+
+As fans de cada header estão em paralelo (splitter/hub): todas recebem os
+mesmos dados, então o header envia 12 cores e cada fan mostra as 12. Valor
+confirmado com `check --leds 12` (uma cor por LED, nenhum apagado); a primeira
+calibração, feita com tudo branco, deu 10 e 6 porque o brilho vazava pelo
+difusor e escondia os LEDs apagados.
 
 Nenhum dispositivo Corsair aparece no USB (`1b1c:*`): a iluminação do H55 RGB
 depende só dos cabos ARGB, e a bomba é alimentada separadamente pelo header de
@@ -61,7 +67,17 @@ O registrador `0x1000` do `0x77` devolve `AUDA0-E6K5-0101`: controlador ENE de
 DRAM de segunda geração, suportado pelo OpenRGB. Detalhes em
 [Protocolo ENE](ene.md).
 
+## Validação no hardware
+
+| Funcionalidade | Placa (IT5702) | Memórias (ENE) |
+|----------------|----------------|----------------|
+| Cor fixa | ✅ | ✅ (cada pente separado) |
+| `static`, `pulse`, `flash`, `cycle`, `random` | ✅ | ✅ (`pulse` testado) |
+| Wave de hardware | ❌ apaga os headers ARGB; removido | — |
+| `rainbow` animado e estático (software), sincronizado entre placa e memórias | ✅ | ✅ |
+| Remapeamento dos 2 pentes de `0x77` para `0x70`/`0x71` | — | ✅ |
+
+`led_c1`, `led_c2` (RGB 12V) e `led_cpu` não têm nada ligado ou visível.
+
 ## Pendências
 - Conectar o ARGB da bomba do H55 (em `D_LED2`, nunca nos headers 12V) e testar.
-- Testar `d_led2`, `led_c1`, `led_c2` e `led_cpu`.
-- Memórias: testar no hardware o remapeamento e as cores (`feat/dram-smbus`).
