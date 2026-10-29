@@ -121,3 +121,14 @@ def test_argb_packets_apply_grb_order():
 def test_argb_packets_reject_rgb_header():
     with pytest.raises(ValueError):
         p.argb_packets(LED_C1, [(1, 2, 3)], 0)
+
+
+@pytest.mark.parametrize("brightness, expected", [(255, 100), (128, 50), (0, 0)])
+def test_pulse_brightness_is_capped_at_100(brightness, expected):
+    """Com brilho acima de 100 o pulse apaga os LEDs (visto no hardware)."""
+    pkt = p.effect_packet(D_LED1, "pulse", (255, 0, 255), brightness=brightness)
+    assert pkt[12] == expected
+
+
+def test_other_effects_keep_full_brightness():
+    assert p.effect_packet(D_LED1, "static", (255, 0, 255), brightness=255)[12] == 255

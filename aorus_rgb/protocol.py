@@ -20,6 +20,10 @@ CMD_INFO = 0x60
 ARGB_LEDS_PER_PACKET = 19
 LED_COUNT_STEPS = (32, 64, 256, 512, 1024)  # índice = código enviado ao chip
 SPEED_MAX = 9
+# O pulse apaga os LEDs com brilho máximo acima de 100 (confirmado na
+# B550M AORUS ELITE; o OpenRGB aplica o mesmo limite). A escala 0-255 da CLI
+# é comprimida para 0-100 nesse efeito.
+PULSE_BRIGHTNESS_MAX = 100
 
 EFFECTS = {
     "none": 0,
@@ -167,6 +171,8 @@ def effect_packet(zone, effect, color, brightness=255, speed=5):
     buf[0] = REPORT_ID
     buf[1] = CMD_EFFECT_BASE + zone.index
     struct.pack_into("<II", buf, 2, 1 << zone.index, 0)
+    if effect == "pulse":
+        brightness = brightness * PULSE_BRIGHTNESS_MAX // 255
     buf[11], buf[12], buf[13] = EFFECTS[effect], brightness, 0
     struct.pack_into("<II", buf, 14, r << 16 | g << 8 | b, 0)
     struct.pack_into("<4H", buf, 22, *periods)
