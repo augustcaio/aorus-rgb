@@ -99,7 +99,16 @@ No `rainbow` animado, o PC calcula a mesma fase para fans e memórias a cada
 quadro, então tudo fica sincronizado. As fans recebem 30 quadros/s (USB, ~7 ms
 por quadro) e as memórias 15/s, cada pente num único bloco SMBus (~7 ms para os
 dois): o barramento, que o BIOS também usa, fica ocupado ~11% do tempo. Medido
-no serviço: menos de 1% de CPU e 9 MB de memória.
+no serviço: ~1% de CPU e 9 MB de memória.
+
+No login, o serviço pode iniciar antes de o sistema dar ao usuário a permissão
+da regra udev. O `run` espera até 15 s pela placa e pelo SMBus das memórias
+antes de aplicar o perfil; se o tempo acabar, avisa e segue, e o reinício
+automático do systemd fica como última garantia.
+
+Suspensão: o serviço continua rodando e retoma os quadros ao acordar. Durante a
+suspensão, o hub das fans DarkFlash mostra o próprio efeito (arco-íris girando)
+até a placa voltar a enviar dados.
 
 ## Estado e configuração
 | Arquivo | Conteúdo | Validade |

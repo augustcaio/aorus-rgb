@@ -44,4 +44,6 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 - Efeitos animados apagavam os headers ARGB depois de usar o RGB Fusion.
 - `pulse` com brilho acima de 100 apagava os LEDs.
 - Memórias fora de sincronia com as fans no `rainbow` animado.
+- No login, a primeira execução do serviço falhava por falta de permissão;
+  o `run` agora espera o acesso à placa e às memórias.
 - Cores e arco-íris usavam 32 LEDs, independentemente das fans.
