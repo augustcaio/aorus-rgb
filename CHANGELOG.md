@@ -6,6 +6,24 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-29
+
+Pacotes de instalação, com as mesmas funções da 1.0.0. Branch
+`release/1.1.0`, tag `v1.1.0`.
+
+### Added
+- Pacote do Arch (`packaging/arch/PKGBUILD`), construído a partir da tag e
+  rodando os testes; instala o programa, a regra udev, o serviço de usuário e
+  o carregamento do `i2c-dev`.
+- Wheel Python para outras distribuições.
+- `packaging/build.sh`, que gera wheel, pacote e `SHA256SUMS` a partir de uma
+  tag, fora da pasta do projeto.
+
+### Changed
+- O serviço roda `/usr/bin/aorus-rgb` e não depende mais da pasta clonada;
+  `install-service.sh` continua servindo para desenvolvimento.
+- Licença declarada como expressão SPDX no `pyproject.toml`.
+
 ## [1.0.0] - 2026-10-29
 
 Primeira versão estável, validada na B550M AORUS ELITE. Branch
@@ -53,5 +71,6 @@ Primeira versão estável, validada na B550M AORUS ELITE. Branch
   o `run` agora espera o acesso à placa e às memórias.
 - Cores e arco-íris usavam 32 LEDs, independentemente das fans.
 
-[Unreleased]: https://github.com/augustcaio/aorus-rgb/compare/v1.0.0...feat/service
+[Unreleased]: https://github.com/augustcaio/aorus-rgb/compare/v1.1.0...feat/packaging
+[1.1.0]: https://github.com/augustcaio/aorus-rgb/tree/v1.1.0
 [1.0.0]: https://github.com/augustcaio/aorus-rgb/tree/v1.0.0
