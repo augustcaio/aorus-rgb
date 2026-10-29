@@ -18,10 +18,24 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
   pentes que dividem o endereço `0x77`.
 - Acesso ao SMBus sem dependências, com bloqueio dos endereços da SPD.
 - Regra udev para o SMBus dos slots de memória.
+- `rainbow all` (headers ARGB e memórias juntos) e arco-íris estático
+  (`--speed 0`).
+- Calibração de LEDs por header: `calibrate`, `check` e `count`, com o valor
+  salvo em `~/.config/aorus-rgb/config.json`.
+- Inicialização da placa uma vez por boot (efeitos zerados e beat desligado).
 
 ### Changed
 - **Quebra:** `static COR --header N` virou `color d_ledN COR`, e `effect`
   recebe a zona como primeiro argumento.
 
+- O aplicar (`0x28`) usa a máscara só das zonas alteradas.
+
+### Removed
+- **Quebra:** efeito de hardware `wave`, que apaga os headers ARGB nesta
+  placa; use `rainbow all`.
+
 ### Fixed
 - Definir cor em um header ARGB religava o efeito embutido do outro.
+- Efeitos animados apagavam os headers ARGB depois de usar o RGB Fusion.
+- `pulse` com brilho acima de 100 apagava os LEDs.
+- Cores e arco-íris usavam 32 LEDs, independentemente das fans.
