@@ -23,12 +23,16 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 - Calibração de LEDs por header: `calibrate`, `check` e `count`, com o valor
   salvo em `~/.config/aorus-rgb/config.json`.
 - Inicialização da placa uma vez por boot (efeitos zerados e beat desligado).
+- `feat/service`: perfis (`profile`), `run` e serviço de usuário do systemd
+  (`install-service.sh`) que aplica a iluminação no login.
 
 ### Changed
 - **Quebra:** `static COR --header N` virou `color d_ledN COR`, e `effect`
   recebe a zona como primeiro argumento.
 
 - O aplicar (`0x28`) usa a máscara só das zonas alteradas.
+- No `rainbow` animado, as memórias usam o rainbow do chip ENE em vez de
+  receber quadros pelo SMBus; o laço mantém 30 quadros/s.
 
 ### Removed
 - **Quebra:** efeito de hardware `wave`, que apaga os headers ARGB nesta
