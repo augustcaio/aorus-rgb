@@ -12,10 +12,28 @@ def masks(transport):
     return [pkt[2] for pkt in transport.sent if pkt[1] == p.CMD_BUILTIN_EFFECT_OFF]
 
 
-def test_init_reads_info(transport):
+def test_init_reads_info_and_initializes_board(transport):
     c = Controller(transport, MemoryState())
-    assert transport.commands() == [p.CMD_INFO]
+    assert transport.commands() == [p.CMD_INFO, *range(0x20, 0x28), p.CMD_APPLY, p.CMD_BEAT]
+    assert transport.sent[-1][2] == 0  # beat desligado
     assert c.info.product.startswith("IT5702")
+
+
+def test_board_is_initialized_once_per_boot(transport):
+    state = MemoryState()
+    Controller(transport, state)
+    transport.sent.clear()
+    Controller(transport, state)
+    assert transport.commands() == [p.CMD_INFO]
+
+
+def test_initialized_flag_survives_runs_but_not_reboots(tmp_path, monkeypatch, transport):
+    path = tmp_path / "state.json"
+    monkeypatch.setattr("aorus_rgb.device._boot_id", lambda: "boot-a")
+    Controller(transport, State(path))
+    assert State(path).board_initialized
+    monkeypatch.setattr("aorus_rgb.device._boot_id", lambda: "boot-b")
+    assert not State(path).board_initialized
 
 
 def test_color_on_second_header_keeps_first_disabled(controller, transport):
