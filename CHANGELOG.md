@@ -13,6 +13,11 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 - CLI: `info`, `color`, `effect`, `rainbow`, `off`.
 - Efeitos de hardware `wave` e `random`, velocidade 0-9 e brilho 0-255 validados.
 - Testes unitários (50) com fixture capturada do hardware real.
+- `feat/dram-smbus`: memórias RGB com controlador ENE `AUDA0-E6K5-0101` via
+  SMBus, como zonas `dram1`, `dram2` e `dram`; remapeamento automático dos
+  pentes que dividem o endereço `0x77`.
+- Acesso ao SMBus sem dependências, com bloqueio dos endereços da SPD.
+- Regra udev para o SMBus dos slots de memória.
 
 ### Changed
 - **Quebra:** `static COR --header N` virou `color d_ledN COR`, e `effect`
