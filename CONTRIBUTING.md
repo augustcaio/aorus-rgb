@@ -14,14 +14,18 @@ Criar uma feature nova:
     git switch --orphan feat/<nome>
 
 ## Commits (Conventional Commits)
-`tipo(escopo): descrição no imperativo`
+Mensagens de commit são escritas **em inglês**, no imperativo:
+
+    type(scope): short description
+
+    Corpo opcional explicando o porquê da mudança.
 
 Tipos: `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `chore`.
 Escopos usados: `device`, `cli`, `udev`, `smbus`, `docs`.
 
 Exemplos:
-- `feat(cli): adicionar comando rainbow`
-- `fix(udev): usar prefixo 70 para aplicar uaccess`
+- `feat(cli): add rainbow command`
+- `fix(udev): use 70- prefix so uaccess is applied`
 
 Os commits têm um único autor (`augustcaio`), sem trailers `Co-Authored-By`.
 
