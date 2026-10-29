@@ -5,6 +5,7 @@ import time
 from contextlib import ExitStack
 
 from . import protocol as p
+from .config import Config
 from .device import Controller, DeviceNotFound
 from .dram import DramController, DramZone
 from .smbus import BusNotFound, ForbiddenAddress
@@ -261,6 +262,34 @@ def cmd_calibrate(devs, a):
     print(f"{z.name}: {lo} LEDs, salvo em {c.config.path} (confira: uma cor por LED, nenhum apagado)")
 
 
+PROFILE_COMMANDS = ("color", "effect", "rainbow", "off")
+DEFAULT_PROFILE = ["rainbow", "all"]
+
+
+def cmd_profile(devs, a):
+    """Mostra ou salva o comando que `run` (e o serviço) aplica."""
+    config = Config()
+    if not a.command:
+        profile = config.profile()
+        print(" ".join(profile) if profile else f"(nenhum; padrão: {' '.join(DEFAULT_PROFILE)})")
+        return
+    if a.command[0] not in PROFILE_COMMANDS:
+        raise ValueError(f"o perfil deve ser um destes comandos: {', '.join(PROFILE_COMMANDS)}")
+    try:
+        build_parser().parse_args(a.command)
+    except SystemExit:
+        raise ValueError(f"perfil inválido: {' '.join(a.command)}") from None
+    config.set_profile(a.command)
+    print(f"perfil salvo: {' '.join(a.command)}")
+
+
+def cmd_run(devs, a):
+    """Aplica o perfil salvo (é o que o serviço do systemd executa)."""
+    argv = Config().profile() or DEFAULT_PROFILE
+    profile = build_parser().parse_args(argv)
+    profile.fn(devs, profile)
+
+
 def build_parser():
     ap = argparse.ArgumentParser(prog="aorus-rgb", description="Controle RGB da B550M Aorus Elite e das memórias")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -301,6 +330,12 @@ def build_parser():
     s = sub.add_parser("calibrate", help="descobre e salva quantos LEDs um header ARGB tem (interativo)")
     s.add_argument("zone", choices=ARGB_CHOICES)
     s.set_defaults(fn=cmd_calibrate)
+
+    s = sub.add_parser("profile", help="mostra ou salva o comando aplicado por `run` e pelo serviço")
+    s.add_argument("command", nargs=argparse.REMAINDER, help="ex.: rainbow all --speed 3")
+    s.set_defaults(fn=cmd_profile)
+
+    sub.add_parser("run", help="aplica o perfil salvo (usado pelo serviço)").set_defaults(fn=cmd_run)
 
     s = sub.add_parser("off", help="apaga uma zona")
     s.add_argument("zone", choices=ZONE_CHOICES, nargs="?", default="all")

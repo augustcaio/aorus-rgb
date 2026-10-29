@@ -18,3 +18,10 @@ def test_config_ignores_missing_or_corrupt_file(tmp_path):
 def test_default_path_follows_xdg(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     assert Config().path == tmp_path / "aorus-rgb" / "config.json"
+
+
+def test_profile_roundtrip(tmp_path):
+    path = tmp_path / "config.json"
+    assert Config(path).profile() is None
+    Config(path).set_profile(["rainbow", "all", "--speed", "3"])
+    assert Config(path).profile() == ["rainbow", "all", "--speed", "3"]

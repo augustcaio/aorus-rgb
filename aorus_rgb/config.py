@@ -25,6 +25,14 @@ class Config:
         self.data.setdefault("zones", {}).setdefault(zone_name, {})["leds"] = count
         self.save()
 
+    def profile(self):
+        """Comando da CLI aplicado por `aorus-rgb run` (lista de argumentos), ou None."""
+        return self.data.get("profile")
+
+    def set_profile(self, argv):
+        self.data["profile"] = list(argv)
+        self.save()
+
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self.data, indent=2) + "\n")

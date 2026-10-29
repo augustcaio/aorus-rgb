@@ -14,11 +14,14 @@ from aorus_rgb.__main__ import (
     cmd_calibrate,
     cmd_check,
     cmd_count,
+    cmd_profile,
     cmd_rainbow,
+    cmd_run,
     parse_color,
     rainbow_frame,
     resolve,
 )
+from aorus_rgb.config import Config
 from aorus_rgb.dram import DramController, rainbow_speed
 
 
@@ -229,3 +232,36 @@ def test_animated_rainbow_on_memory_only_returns_immediately(controller):
 @pytest.mark.parametrize("speed, expected", [(1, 4), (5, 2), (10, 0), (50, 0)])
 def test_rainbow_speed_maps_to_ene(speed, expected):
     assert rainbow_speed(speed) == expected
+
+
+# --- perfil e run ---------------------------------------------------------
+
+def test_profile_saves_a_valid_command(capsys):
+    run(cmd_profile, None, "profile", "rainbow", "all", "--speed", "3")
+    assert Config().profile() == ["rainbow", "all", "--speed", "3"]
+    assert "perfil salvo" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("argv", [["calibrate", "d_led1"], ["rainbow", "led_c1"], ["color", "all"]])
+def test_profile_rejects_invalid_commands(argv):
+    with pytest.raises(ValueError):
+        run(cmd_profile, None, "profile", *argv)
+    assert Config().profile() is None
+
+
+def test_profile_without_arguments_shows_the_default(capsys):
+    run(cmd_profile, None, "profile")
+    assert "padrão: rainbow all" in capsys.readouterr().out
+
+
+def test_run_applies_the_saved_profile(controller, transport):
+    Config().set_profile(["color", "d_led1", "ff0000"])
+    controller.config = Config()
+    run(cmd_run, controller, "run")
+    assert [pkt[1] for pkt in transport.sent if pkt[1] in (0x58, 0x59)] == [0x58, 0x58]
+
+
+def test_run_without_profile_uses_the_rainbow(controller, transport, monkeypatch):
+    stop_after_first_frame(monkeypatch)
+    run(cmd_run, controller, "run")
+    assert {pkt[1] for pkt in transport.sent} >= {0x58, 0x59}
