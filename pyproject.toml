@@ -21,6 +21,7 @@ packages = ["aorus_rgb"]
 
 [tool.ruff]
 line-length = 110
+cache-dir = "~/.cache/aorus-rgb/ruff"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
