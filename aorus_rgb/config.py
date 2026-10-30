@@ -33,6 +33,28 @@ class Config:
         self.data["profile"] = list(argv)
         self.save()
 
+    def scene(self):
+        """Estado de cada zona aplicado pelo daemon (zona -> spec), ou None."""
+        return self.data.get("scene")
+
+    def set_scene(self, scene):
+        self.data["scene"] = scene
+        self.save()
+
+    def profiles(self):
+        """Cenas salvas com nome (nome -> cena)."""
+        return self.data.get("profiles", {})
+
+    def save_profile(self, name, scene):
+        self.data.setdefault("profiles", {})[name] = scene
+        self.save()
+
+    def delete_profile(self, name):
+        if name not in self.profiles():
+            raise ValueError(f"perfil não encontrado: {name}")
+        del self.data["profiles"][name]
+        self.save()
+
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self.data, indent=2) + "\n")
