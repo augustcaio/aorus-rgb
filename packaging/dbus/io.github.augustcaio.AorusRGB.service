@@ -1,0 +1,6 @@
+# Ativação pelo D-Bus: um cliente (ex.: a interface) que chama o daemon o inicia
+# pelo serviço do systemd, mesmo que ele não esteja habilitado no login.
+[D-BUS Service]
+Name=io.github.augustcaio.AorusRGB
+Exec=/usr/bin/aorus-rgb daemon
+SystemdService=aorus-rgb.service

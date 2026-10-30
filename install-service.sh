@@ -28,7 +28,7 @@ fi
 
 # mesma unidade do pacote, rodando o código do venv de desenvolvimento
 mkdir -p "$UNIT_DIR"
-sed "s|^ExecStart=.*|ExecStart=$HOME/.venvs/aorus-rgb/bin/aorus-rgb run|" "$REPO/$UNIT" > "$UNIT_DIR/$UNIT"
+sed "s|/usr/bin/aorus-rgb|$HOME/.venvs/aorus-rgb/bin/aorus-rgb|" "$REPO/$UNIT" > "$UNIT_DIR/$UNIT"
 chmod 644 "$UNIT_DIR/$UNIT"
 systemctl --user daemon-reload
 systemctl --user enable --now "$UNIT"

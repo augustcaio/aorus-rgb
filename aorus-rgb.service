@@ -1,16 +1,17 @@
-# Serviço de usuário: aplica o perfil de iluminação (aorus-rgb run) no login.
+# Serviço de usuário: o daemon do aorus-rgb, dono do hardware, restaura a última
+# cena no login e atende a CLI e a interface pelo D-Bus.
 # Pacote: /usr/lib/systemd/user/aorus-rgb.service (systemctl --user enable --now aorus-rgb)
-# Desenvolvimento: ./install-service.sh, que troca o ExecStart pelo venv
+# Desenvolvimento: ./install-service.sh, que aponta o ExecStart para o venv
 [Unit]
-Description=aorus-rgb: perfil de iluminação RGB da placa e das memórias
+Description=aorus-rgb: daemon de iluminação RGB da placa e das memórias
 Documentation=https://github.com/augustcaio/aorus-rgb
 
 [Service]
-Type=exec
-ExecStart=/usr/bin/aorus-rgb run
-# o rainbow animado trata SIGINT (Ctrl+C) e encerra de forma limpa
-KillSignal=SIGINT
-# placa ou SMBus ainda indisponíveis no login: tenta de novo
+# pronto quando o nome io.github.augustcaio.AorusRGB aparece no D-Bus
+Type=dbus
+BusName=io.github.augustcaio.AorusRGB
+ExecStart=/usr/bin/aorus-rgb daemon
+# placa ou SMBus indisponíveis, ou erro de hardware: tenta de novo
 Restart=on-failure
 RestartSec=5
 

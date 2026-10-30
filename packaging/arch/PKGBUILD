@@ -6,7 +6,7 @@ pkgdesc="Controle RGB da Gigabyte B550M AORUS ELITE (ITE IT5702) e de memórias 
 arch=('any')
 url="https://github.com/augustcaio/aorus-rgb"
 license=('GPL-2.0-or-later')
-depends=('python')
+depends=('python' 'python-gobject')
 makedepends=('git' 'python-build' 'python-installer' 'python-setuptools' 'python-wheel')
 checkdepends=('python-pytest')
 optdepends=('i2c-tools: diagnóstico do SMBus das memórias (i2cdetect)')
@@ -30,4 +30,6 @@ package() {
   install -Dm644 70-aorus-rgb.rules "$pkgdir/usr/lib/udev/rules.d/70-aorus-rgb.rules"
   install -Dm644 aorus-rgb.service "$pkgdir/usr/lib/systemd/user/aorus-rgb.service"
   install -Dm644 packaging/modules-load.conf "$pkgdir/usr/lib/modules-load.d/aorus-rgb.conf"
+  install -Dm644 packaging/dbus/io.github.augustcaio.AorusRGB.service \
+    "$pkgdir/usr/share/dbus-1/services/io.github.augustcaio.AorusRGB.service"
 }

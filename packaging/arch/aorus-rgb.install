@@ -2,7 +2,8 @@ post_install() {
   modprobe i2c-dev 2>/dev/null || true
   udevadm trigger --subsystem-match=hidraw --subsystem-match=i2c-dev 2>/dev/null || true
   cat <<'MSG'
-==> aorus-rgb instalado. Para aplicar o perfil no login (como usuário, sem sudo):
+==> aorus-rgb instalado. Para o daemon restaurar as luzes no login (como
+    usuário, sem sudo):
       systemctl --user enable --now aorus-rgb
 ==> As memórias RGB precisam do parâmetro de kernel acpi_enforce_resources=lax
     (UKI: /etc/kernel/cmdline + mkinitcpio -P; GRUB: GRUB_CMDLINE_LINUX_DEFAULT
@@ -14,5 +15,10 @@ MSG
 
 post_upgrade() {
   udevadm trigger --subsystem-match=hidraw --subsystem-match=i2c-dev 2>/dev/null || true
-  echo "==> aorus-rgb atualizado: systemctl --user restart aorus-rgb"
+  cat <<'MSG'
+==> aorus-rgb atualizado. Como usuário:
+      systemctl --user daemon-reload && systemctl --user restart aorus-rgb
+==> 2.0: o serviço agora roda o daemon D-Bus. O perfil antigo (`profile` com
+    um comando) foi substituído por perfis com nome: aorus-rgb profile save NOME
+MSG
 }
