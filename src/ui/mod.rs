@@ -2,6 +2,7 @@
 //! - início: dispositivos, efeitos e cor; muda tudo junto (sincronizado);
 //! - dispositivo: desenho com as zonas; muda as zonas selecionadas.
 
+mod art;
 mod controls;
 mod diagram;
 mod icons;
@@ -138,7 +139,7 @@ pub fn build(app: &adw::Application, options: Options) {
         .into_iter()
         .map(|device| {
             let icon = icons::area(RAIL_SIZE, move |cr, size| {
-                icons::device(cr, device, size, (0.92, 0.92, 0.92), false)
+                icons::device(cr, device, size, theme::LINE)
             });
             let button = gtk::Button::builder()
                 .child(&icon)
@@ -286,7 +287,7 @@ impl App {
             .build();
         for (i, device) in Device::ALL.into_iter().enumerate() {
             let icon = icons::area(64, move |cr, size| {
-                icons::device(cr, device, size, theme::ORANGE, true)
+                icons::device(cr, device, size, theme::LINE)
             });
             let frame = gtk::Button::builder()
                 .child(&icon)

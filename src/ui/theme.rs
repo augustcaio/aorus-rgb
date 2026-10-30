@@ -3,6 +3,8 @@
 
 pub const ORANGE: (f64, f64, f64) = (0.910, 0.392, 0.106); // #e8641b
 pub const GRAY: (f64, f64, f64) = (0.55, 0.55, 0.55);
+/// Traço dos desenhos de dispositivos; o laranja fica para a seleção.
+pub const LINE: (f64, f64, f64) = (0.78, 0.78, 0.80);
 
 pub const CSS: &str = r#"
 @define-color accent_bg_color #e8641b;
