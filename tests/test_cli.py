@@ -16,13 +16,11 @@ from aorus_rgb.__main__ import (
     cmd_count,
     cmd_profile,
     cmd_rainbow,
-    cmd_run,
     parse_color,
     rainbow_frame,
     resolve,
     wait_for_device_access,
 )
-from aorus_rgb.config import Config
 from aorus_rgb.device import DeviceNotFound
 from aorus_rgb.dram import DramController
 from aorus_rgb.smbus import BusNotFound
@@ -249,42 +247,17 @@ def test_animated_rainbow_on_memory_only_also_streams(controller, monkeypatch):
     assert len(memory_frames(bus, 0x70)) == 1
 
 
-# --- perfil e run ---------------------------------------------------------
+# --- perfis ------------------------------------------------------------------
 
-def test_profile_saves_a_valid_command(capsys):
-    run(cmd_profile, None, "profile", "rainbow", "all", "--speed", "3")
-    assert Config().profile() == ["rainbow", "all", "--speed", "3"]
-    assert "perfil salvo" in capsys.readouterr().out
-
-
-@pytest.mark.parametrize("argv", [["calibrate", "d_led1"], ["rainbow", "led_c1"], ["color", "all"]])
-def test_profile_rejects_invalid_commands(argv):
-    with pytest.raises(ValueError):
-        run(cmd_profile, None, "profile", *argv)
-    assert Config().profile() is None
+def test_profiles_need_the_daemon():
+    with pytest.raises(ValueError, match="daemon"):
+        run(cmd_profile, None, "profile", "save", "noite")
 
 
-def test_profile_without_arguments_shows_the_default(capsys):
-    run(cmd_profile, None, "profile")
-    assert "padrão: rainbow all" in capsys.readouterr().out
-
-
-@pytest.fixture
-def devices_ready(monkeypatch):
-    monkeypatch.setattr("aorus_rgb.__main__.wait_for_device_access", list)
-
-
-def test_run_applies_the_saved_profile(controller, transport, devices_ready):
-    Config().set_profile(["color", "d_led1", "ff0000"])
-    controller.config = Config()
-    run(cmd_run, controller, "run")
-    assert [pkt[1] for pkt in transport.sent if pkt[1] in (0x58, 0x59)] == [0x58, 0x58]
-
-
-def test_run_without_profile_uses_the_rainbow(controller, transport, monkeypatch, devices_ready):
-    stop_after_first_frame(monkeypatch)
-    run(cmd_run, controller, "run")
-    assert {pkt[1] for pkt in transport.sent} >= {0x58, 0x59}
+@pytest.mark.parametrize("argv", [["profile", "rename", "x"], ["run"]])
+def test_old_profile_syntax_and_run_are_gone(argv):
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(argv)
 
 
 # --- espera pela permissão no login ---------------------------------------

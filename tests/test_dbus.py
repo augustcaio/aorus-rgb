@@ -1,5 +1,6 @@
 """Testes do daemon pelo D-Bus, num barramento privado (Gio.TestDBus)."""
 
+import re
 import threading
 import time
 
@@ -168,3 +169,89 @@ def test_introspection_lists_the_api(daemon):
     xml = reply.unpack()[0]
     for method in ("SetRainbow", "ApplyProfile", "LightFirst"):
         assert f'name="{method}"' in xml
+
+
+# --- CLI pelo daemon ----------------------------------------------------------
+
+@pytest.fixture
+def cli_daemon(daemon, monkeypatch):
+    """CLI apontada para o daemon do barramento privado; devolve o motor."""
+    from aorus_rgb import __main__ as cli
+    from aorus_rgb.client import DaemonClient
+
+    client, service = daemon
+    monkeypatch.setattr(cli, "connect", lambda: DaemonClient(client))
+    return cli, service.engine
+
+
+def test_cli_commands_go_through_the_daemon(cli_daemon):
+    cli, engine = cli_daemon
+    cli.main(["color", "d_led1", "#FF0000"])
+    cli.main(["effect", "led_c1", "pulse", "00ffff", "--speed", "3"])
+    cli.main(["rainbow", "dram", "--speed", "0"])
+    cli.main(["off", "led_c2"])
+    assert engine.scene["d_led1"] == {"mode": "color", "color": "ff0000"}
+    assert engine.scene["led_c1"]["speed"] == 3
+    assert engine.scene["dram2"] == {"mode": "rainbow", "speed": 0.0, "brightness": 255}
+    assert engine.scene["led_c2"] == {"mode": "off"}
+
+
+def test_cli_shows_daemon_errors(cli_daemon):
+    cli, _ = cli_daemon
+    with pytest.raises(SystemExit) as excinfo:
+        cli.main(["color", "dram3", "ff0000"])
+    assert str(excinfo.value) == "erro: zona desconhecida: dram3"  # sem o prefixo GDBus.Error
+
+
+def test_cli_leds_and_count_need_the_daemon_stopped(cli_daemon):
+    cli, _ = cli_daemon
+    with pytest.raises(SystemExit, match="--leds"):
+        cli.main(["color", "d_led1", "ff0000", "--leds", "20"])
+    with pytest.raises(SystemExit, match="check d_led1 --leds 12"):
+        cli.main(["count", "d_led1", "12"])
+
+
+def test_cli_info_through_the_daemon(cli_daemon, capsys):
+    cli, _ = cli_daemon
+    cli.main(["color", "dram1", "00ff00"])
+    cli.main(["info"])
+    out = capsys.readouterr().out
+    assert "daemon      : ativo" in out
+    assert "dram1    DRAM    8 LEDs  cor #00ff00" in out
+    assert "led_c1   RGB     1 LED " in out
+
+
+def test_cli_profiles_through_the_daemon(cli_daemon, capsys):
+    cli, engine = cli_daemon
+    cli.main(["color", "all", "ff0000"])
+    cli.main(["profile", "save", "vermelho"])
+    cli.main(["profile"])
+    assert "vermelho" in capsys.readouterr().out
+    cli.main(["rainbow", "all"])
+    cli.main(["profile", "apply", "vermelho"])
+    assert engine.scene["d_led1"] == {"mode": "color", "color": "ff0000"}
+    cli.main(["profile", "delete", "vermelho"])
+    with pytest.raises(SystemExit, match="nome do perfil"):
+        cli.main(["profile", "apply"])
+
+
+def test_cli_check_pauses_and_restores_the_zone(cli_daemon, monkeypatch, capsys):
+    cli, engine = cli_daemon
+    cli.main(["rainbow", "d_led1"])
+    monkeypatch.setattr("builtins.input", lambda prompt: "")
+    cli.main(["check", "d_led1"])
+    assert "d_led1: 32 LEDs -> 1 vermelho" in capsys.readouterr().out
+    assert engine.calibrating == set()
+    assert "d_led1" in engine.animated
+
+
+def test_cli_calibrate_through_the_daemon(cli_daemon, monkeypatch):
+    cli, engine = cli_daemon
+
+    def user_looking_at_12_leds(prompt):
+        lit = re.search(r"\[(\d+) LEDs\]", prompt)
+        return "s" if (int(lit.group(1)) if lit else 256) >= 12 else "n"
+
+    monkeypatch.setattr("builtins.input", user_looking_at_12_leds)
+    cli.main(["calibrate", "d_led1"])
+    assert engine.config.leds("d_led1") == 12

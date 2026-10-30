@@ -5,7 +5,7 @@ import time
 from contextlib import ExitStack
 
 from . import protocol as p
-from .config import Config
+from .client import connect
 from .device import Controller, DeviceNotFound, find_hidraw
 from .dram import DramController, DramZone
 from .patterns import (
@@ -185,8 +185,12 @@ def cmd_check(devs, a):
             board.set_led_count(z, a.leds)
         n = board.led_count(z)
         light_first(board, z, n, palette_colors(n))
-        legend = ", ".join(f"{i + 1} {CHECK_PALETTE[i % len(CHECK_PALETTE)][0]}" for i in range(n))
-        print(f"{z.name}: {n} LEDs -> {legend}")
+        print(check_legend(z.name, n))
+
+
+def check_legend(name, n):
+    colors = ", ".join(f"{i + 1} {CHECK_PALETTE[i % len(CHECK_PALETTE)][0]}" for i in range(n))
+    return f"{name}: {n} LEDs -> {colors}"
 
 
 def ask_yes(question):
@@ -204,51 +208,39 @@ def ask_yes(question):
 CALIBRATE_MAX = p.LED_COUNT_STEPS[2]  # 256: limite dos headers do IT57xx
 
 
-def cmd_calibrate(devs, a):
-    """Busca binária guiada pelo menor N que acende todos os LEDs; salva o resultado.
+def search_led_count(name, light):
+    """Busca binária guiada pelo menor N que acende todos os LEDs.
 
     Funciona com fans em cadeia (N = soma dos LEDs) e em splitter/hub paralelo
-    (N = LEDs da fan com mais LEDs), sem depender de marca ou modelo.
+    (N = LEDs da fan com mais LEDs), sem depender de marca ou modelo. Usa cores
+    distintas: com tudo branco, o brilho vaza pelo difusor e esconde LEDs
+    apagados (deu 10 para fans de 12 LEDs na B550M AORUS ELITE).
     """
-    c, (z,) = board_argb(a.zone, devs)
-    # cores distintas: com tudo branco, o brilho vaza pelo difusor e esconde
-    # LEDs apagados (deu 10 para fans de 12 LEDs na B550M AORUS ELITE)
-    light_first(c, z, CALIBRATE_MAX, palette_colors(CALIBRATE_MAX))
-    if not ask_yes(f"{z.name}: com {CALIBRATE_MAX} LEDs, todos os LEDs de todas as fans estão acesos?"):
-        raise ValueError(f"{z.name}: nem todos acendem com {CALIBRATE_MAX} LEDs; confira os cabos")
+    light(CALIBRATE_MAX)
+    if not ask_yes(f"{name}: com {CALIBRATE_MAX} LEDs, todos os LEDs de todas as fans estão acesos?"):
+        raise ValueError(f"{name}: nem todos acendem com {CALIBRATE_MAX} LEDs; confira os cabos")
     lo, hi = 1, CALIBRATE_MAX
     while lo < hi:
         mid = (lo + hi) // 2
-        light_first(c, z, mid, palette_colors(mid))
-        if ask_yes(f"{z.name}: [{mid} LEDs] todos os LEDs de todas as fans estão acesos (nenhum apagado)?"):
+        light(mid)
+        if ask_yes(f"{name}: [{mid} LEDs] todos os LEDs de todas as fans estão acesos (nenhum apagado)?"):
             hi = mid
         else:
             lo = mid + 1
-    c.set_chip_led_count(z, lo)
-    c.config.set_leds(z.name, lo)
-    light_first(c, z, lo, palette_colors(lo))
-    print(f"{z.name}: {lo} LEDs, salvo em {c.config.path} (confira: uma cor por LED, nenhum apagado)")
+    return lo
 
 
-PROFILE_COMMANDS = ("color", "effect", "rainbow", "off")
-DEFAULT_PROFILE = ["rainbow", "all"]
+def cmd_calibrate(devs, a):
+    c, (z,) = board_argb(a.zone, devs)
+    count = search_led_count(z.name, lambda n: light_first(c, z, n, palette_colors(n)))
+    c.set_chip_led_count(z, count)
+    c.config.set_leds(z.name, count)
+    light_first(c, z, count, palette_colors(count))
+    print(f"{z.name}: {count} LEDs, salvo em {c.config.path} (confira: uma cor por LED, nenhum apagado)")
 
 
 def cmd_profile(devs, a):
-    """Mostra ou salva o comando que `run` (e o serviço) aplica."""
-    config = Config()
-    if not a.command:
-        profile = config.profile()
-        print(" ".join(profile) if profile else f"(nenhum; padrão: {' '.join(DEFAULT_PROFILE)})")
-        return
-    if a.command[0] not in PROFILE_COMMANDS:
-        raise ValueError(f"o perfil deve ser um destes comandos: {', '.join(PROFILE_COMMANDS)}")
-    try:
-        build_parser().parse_args(a.command)
-    except SystemExit:
-        raise ValueError(f"perfil inválido: {' '.join(a.command)}") from None
-    config.set_profile(a.command)
-    print(f"perfil salvo: {' '.join(a.command)}")
+    raise ValueError("perfis precisam do daemon: systemctl --user start aorus-rgb")
 
 
 RUN_WAIT_SECONDS = 15
@@ -283,16 +275,6 @@ def wait_for_device_access(timeout=RUN_WAIT_SECONDS, poll=0.25):
         time.sleep(poll)
 
 
-def cmd_run(devs, a):
-    """Aplica o perfil salvo (é o que o serviço do systemd executa)."""
-    pending = wait_for_device_access()
-    if pending:
-        warn(f"sem acesso após {RUN_WAIT_SECONDS}s: {', '.join(pending)}")
-    argv = Config().profile() or DEFAULT_PROFILE
-    profile = build_parser().parse_args(argv)
-    profile.fn(devs, profile)
-
-
 def cmd_daemon(devs, a):
     """Dono do hardware: restaura a última cena e atende a CLI e a interface pelo D-Bus."""
     try:
@@ -310,6 +292,108 @@ def cmd_daemon(devs, a):
     code = dbus_service.run(engine)
     if code:
         sys.exit(code)
+
+
+# --- comandos pelo daemon ------------------------------------------------------
+LEDS_NEED_DIRECT = "--leds muda a capacidade do chip e pede o daemon parado; use calibrate ou check --leds"
+
+
+def to_hex(color):
+    return "".join(f"{c:02x}" for c in color)
+
+
+def describe(spec):
+    if spec is None:
+        return "-"
+    mode = spec["mode"]
+    if mode == "color":
+        return f"cor #{spec['color']}"
+    if mode == "effect":
+        return f"{spec['effect']} #{spec['color']}, velocidade {spec['speed']}, brilho {spec['brightness']}"
+    if mode == "rainbow":
+        return "arco-íris estático" if spec["speed"] == 0 else f"arco-íris, velocidade {spec['speed']:g}"
+    return "desligado"
+
+
+def daemon_info(client, a):
+    info = client.call("GetDeviceInfo")[0]
+    state = client.call("GetState")[0]
+    print("daemon      : ativo")
+    print(f"produto     : {info.get('board.product', '-')}")
+    print(f"firmware    : {info.get('board.firmware', '-')}")
+    print("zonas       :")
+    for name, kind, leds in client.call("GetZones")[0]:
+        leds_label = f"{leds:>3} LED{'s' if leds != 1 else ' '}"
+        print(f"  {name:<8} {kind.upper():<5} {leds_label}  {describe(state.get(name))}")
+
+
+def daemon_color(client, a):
+    if a.leds:
+        raise ValueError(LEDS_NEED_DIRECT)
+    client.call("SetColor", "(ss)", a.zone, to_hex(a.color))
+
+
+def daemon_effect(client, a):
+    client.call("SetEffect", "(sssuu)", a.zone, a.name, to_hex(a.color), a.brightness, a.speed)
+
+
+def daemon_rainbow(client, a):
+    if a.leds:
+        raise ValueError(LEDS_NEED_DIRECT)
+    client.call("SetRainbow", "(sdu)", a.zone, float(a.speed), a.brightness)
+
+
+def daemon_off(client, a):
+    client.call("Off", "(s)", a.zone)
+
+
+def daemon_count(client, a):
+    raise ValueError(f"com o daemon rodando, use: aorus-rgb check {a.zone} --leds {a.n}")
+
+
+def daemon_check(client, a):
+    zones = client.zones()
+    names = ARGB_CHOICES if a.zone == "all" else [a.zone]
+    for name in names:
+        n = a.leds or zones[name][1]
+        client.call("LightFirst", "(su)", name, n)
+        print(check_legend(name, n))
+    try:
+        input("Enter para voltar ao estado anterior... ")
+    except EOFError:
+        return  # sem terminal: o padrão fica até o próximo comando nessa zona
+    for name in names:
+        client.call("EndCalibration", "(s)", name)
+
+
+def daemon_calibrate(client, a):
+    count = search_led_count(a.zone, lambda n: client.call("LightFirst", "(su)", a.zone, n))
+    client.call("SetLedCount", "(su)", a.zone, count)
+    print(f"{a.zone}: {count} LEDs, salvo pelo daemon")
+
+
+def daemon_profile(client, a):
+    if a.action == "list":
+        names = client.call("ListProfiles")[0]
+        print("\n".join(names) if names else "(nenhum perfil salvo)")
+        return
+    if not a.name:
+        raise ValueError(f"informe o nome do perfil: aorus-rgb profile {a.action} NOME")
+    method = {"save": "SaveProfile", "apply": "ApplyProfile", "delete": "DeleteProfile"}[a.action]
+    client.call(method, "(s)", a.name)
+
+
+DAEMON_COMMANDS = {
+    "info": daemon_info,
+    "color": daemon_color,
+    "effect": daemon_effect,
+    "rainbow": daemon_rainbow,
+    "off": daemon_off,
+    "count": daemon_count,
+    "check": daemon_check,
+    "calibrate": daemon_calibrate,
+    "profile": daemon_profile,
+}
 
 
 def build_parser():
@@ -353,11 +437,10 @@ def build_parser():
     s.add_argument("zone", choices=ARGB_CHOICES)
     s.set_defaults(fn=cmd_calibrate)
 
-    s = sub.add_parser("profile", help="mostra ou salva o comando aplicado por `run` e pelo serviço")
-    s.add_argument("command", nargs=argparse.REMAINDER, help="ex.: rainbow all --speed 3")
+    s = sub.add_parser("profile", help="perfis com nome, guardados pelo daemon")
+    s.add_argument("action", choices=["list", "save", "apply", "delete"], nargs="?", default="list")
+    s.add_argument("name", nargs="?", help="nome do perfil (save, apply e delete)")
     s.set_defaults(fn=cmd_profile)
-
-    sub.add_parser("run", help="aplica o perfil salvo (usado pelo serviço)").set_defaults(fn=cmd_run)
 
     sub.add_parser("daemon", help="daemon D-Bus: dono do hardware, usado pelo serviço e pela interface").set_defaults(
         fn=cmd_daemon
@@ -372,6 +455,10 @@ def build_parser():
 def main(argv=None):
     a = build_parser().parse_args(argv)
     try:
+        client = connect() if a.cmd in DAEMON_COMMANDS else None
+        if client is not None:
+            DAEMON_COMMANDS[a.cmd](client, a)
+            return
         with ExitStack() as stack:
             a.fn(Devices(stack), a)
     except (DeviceNotFound, BusNotFound, ForbiddenAddress, ValueError) as e:
