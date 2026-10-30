@@ -1,0 +1,46 @@
+# Maintainer: Caio Augusto <21364833+augustcaio@users.noreply.github.com>
+pkgname=aorus-rgb-gui
+pkgver=2.0.0
+pkgrel=1
+pkgdesc="Interface GTK do aorus-rgb: efeitos e cores da B550M AORUS ELITE e das memórias RGB"
+arch=('x86_64')
+url="https://github.com/augustcaio/aorus-rgb"
+license=('GPL-2.0-or-later')
+# aorus-rgb: a interface conversa com o daemon pelo D-Bus (o namcap não vê isso)
+depends=("aorus-rgb>=$pkgver" 'gtk4' 'libadwaita' 'glib2' 'cairo' 'libgcc' 'glibc' 'hicolor-icon-theme')
+makedepends=('cargo' 'git')
+# o binário já sai sem símbolos (strip no Cargo.toml): não há o que pôr num -debug
+options=('!debug')
+source=("aorus-rgb::git+https://github.com/augustcaio/aorus-rgb.git#tag=v$pkgver")
+sha256sums=('SKIP')
+
+prepare() {
+  cd aorus-rgb/gui
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd aorus-rgb/gui
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd aorus-rgb/gui
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo test --frozen --release
+}
+
+package() {
+  cd aorus-rgb/gui
+  install -Dm755 target/release/aorus-rgb-gui "$pkgdir/usr/bin/aorus-rgb-gui"
+  install -Dm644 data/io.github.augustcaio.AorusRGB.Gui.desktop \
+    "$pkgdir/usr/share/applications/io.github.augustcaio.AorusRGB.Gui.desktop"
+  install -Dm644 data/icons/hicolor/scalable/apps/io.github.augustcaio.AorusRGB.Gui.svg \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.augustcaio.AorusRGB.Gui.svg"
+  install -Dm644 data/icons/hicolor/symbolic/apps/io.github.augustcaio.AorusRGB.Gui-symbolic.svg \
+    "$pkgdir/usr/share/icons/hicolor/symbolic/apps/io.github.augustcaio.AorusRGB.Gui-symbolic.svg"
+}
