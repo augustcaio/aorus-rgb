@@ -34,6 +34,21 @@ impl Settings {
         self.save();
     }
 
+    /// Conectores da placa sem nada ligado (a placa não tem como detectar).
+    pub fn unused(&self) -> Vec<String> {
+        self.file
+            .string_list("board", "unused")
+            .map(|list| list.iter().map(|s| s.to_string()).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn set_unused(&self, names: &[String]) {
+        // formato de lista do KeyFile ("a;b;"); o glib-rs não expõe set_string_list
+        let list: String = names.iter().map(|n| format!("{n};")).collect();
+        self.file.set_string("board", "unused", &list);
+        self.save();
+    }
+
     fn save(&self) {
         let Some(path) = &self.path else { return };
         if let Some(dir) = path.parent() {

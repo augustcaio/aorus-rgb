@@ -4,6 +4,7 @@
 //!   --mock               hardware simulado, sem daemon (para validar a interface)
 //!   --screenshot ARQ     salva a janela em PNG e fecha (validação automática)
 //!   --page PÁGINA        página inicial: home, board ou memory
+//!   --dialog DIÁLOGO     abre um diálogo ao iniciar: connectors ou about
 
 mod backend;
 mod model;
@@ -21,6 +22,7 @@ pub struct Options {
     pub mock: bool,
     pub screenshot: Option<String>,
     pub page: ui::Page,
+    pub dialog: Option<String>,
 }
 
 fn parse_args() -> Result<Options, String> {
@@ -39,9 +41,18 @@ fn parse_args() -> Result<Options, String> {
                 options.page =
                     ui::Page::parse(&page).ok_or(format!("página desconhecida: {page}"))?;
             }
+            "--dialog" => {
+                let dialog = args
+                    .next()
+                    .ok_or("--dialog precisa de connectors ou about")?;
+                if !matches!(dialog.as_str(), "connectors" | "about") {
+                    return Err(format!("diálogo desconhecido: {dialog}"));
+                }
+                options.dialog = Some(dialog);
+            }
             "-h" | "--help" => {
                 println!(
-                    "uso: aorus-rgb-gui [--mock] [--screenshot ARQ.png] [--page home|board|memory]"
+                    "uso: aorus-rgb-gui [--mock] [--screenshot ARQ.png] [--page home|board|memory] [--dialog connectors|about]"
                 );
                 std::process::exit(0);
             }

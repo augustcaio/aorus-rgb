@@ -122,6 +122,8 @@ pub struct Diagram {
     zones: RefCell<Vec<Zone>>,
     state: RefCell<HashMap<String, ZoneState>>,
     selected: RefCell<HashSet<String>>,
+    /// Conectores marcados como vazios: aparecem só como o conector na placa.
+    hidden: RefCell<HashSet<String>>,
     hits: RefCell<Vec<(String, Rect)>>,
     on_select: RefCell<Option<Box<dyn Fn()>>>,
     start: Instant,
@@ -139,6 +141,7 @@ impl Diagram {
             zones: RefCell::new(Vec::new()),
             state: RefCell::new(HashMap::new()),
             selected: RefCell::new(HashSet::new()),
+            hidden: RefCell::new(HashSet::new()),
             hits: RefCell::new(Vec::new()),
             on_select: RefCell::new(None),
             start: Instant::now(),
@@ -190,6 +193,14 @@ impl Diagram {
 
     pub fn set_state(&self, state: HashMap<String, ZoneState>) {
         self.state.replace(state);
+        self.area.queue_draw();
+    }
+
+    pub fn set_hidden(&self, hidden: HashSet<String>) {
+        self.selected
+            .borrow_mut()
+            .retain(|name| !hidden.contains(name));
+        self.hidden.replace(hidden);
         self.area.queue_draw();
     }
 
@@ -321,6 +332,15 @@ impl Diagram {
         let Some(zone) = self.zone(callout.name) else {
             return;
         };
+        if self.hidden.borrow().contains(callout.name) {
+            // nada ligado: só o conector vazio, no traço das outras peças
+            let (hx, hy, hw, hh) = callout.header;
+            cr.set_source_rgba(LINE.0, LINE.1, LINE.2, 0.55);
+            cr.set_line_width(1.0);
+            cr.rectangle(hx.round() + 0.5, hy.round() + 0.5, hw.round(), hh.round());
+            let _ = cr.stroke();
+            return;
+        }
         let selected = self.selected.borrow().contains(callout.name);
         let state = self.state.borrow().get(callout.name).cloned();
         let lit = state.as_ref().is_some_and(|s| *s != ZoneState::Off);
@@ -488,6 +508,18 @@ impl Diagram {
             y = (y + sh + GAP + LABEL).round();
         }
     }
+}
+
+/// Nome impresso na placa e posição de cada conector de LED, pelo manual.
+pub fn connector(name: &str) -> Option<(&'static str, &'static str)> {
+    Some(match name {
+        "led_c1" => ("LED_C1", "borda de baixo, à esquerda"),
+        "d_led1" => ("D_LED1", "borda de baixo, à esquerda"),
+        "led_c2" => ("LED_C2", "canto superior direito"),
+        "d_led2" => ("D_LED2", "canto superior direito"),
+        "led_cpu" => ("LED_CPU", "ao lado do SYS_FAN1"),
+        _ => return None,
+    })
 }
 
 #[derive(Clone, Copy)]

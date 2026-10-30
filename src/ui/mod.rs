@@ -12,16 +12,16 @@ mod theme;
 mod wheel;
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::time::Duration;
 
 use adw::prelude::*;
-use gtk::glib;
+use gtk::{gio, glib};
 
 use crate::Options;
 use crate::backend::Backend;
-use crate::model::{Device, Effect, Look, Zone, ZoneState};
+use crate::model::{Device, Effect, Kind, Look, Zone, ZoneState};
 use crate::settings::Settings;
 use controls::Controls;
 
@@ -94,6 +94,8 @@ struct App {
     sync: gtk::Switch,
     updating_sync: Cell<bool>,
     settings: Settings,
+    /// Conectores da placa marcados como vazios.
+    unused: RefCell<HashSet<String>>,
     device_controls: Rc<Controls>,
     diagram: Rc<Diagram>,
     rail: Vec<(Device, gtk::Button)>,
@@ -126,8 +128,18 @@ pub fn build(app: &adw::Application, options: Options) {
     sync_box.set_tooltip_text(Some("Aplica o mesmo efeito em todos os dispositivos"));
     sync_box.append(&sync_label);
     sync_box.append(&sync);
+    let menu = gio::Menu::new();
+    menu.append(Some("Conectores da placa…"), Some("win.connectors"));
+    menu.append(Some("Sobre o AORUS RGB"), Some("win.about"));
+    let menu_button = gtk::MenuButton::builder()
+        .icon_name("open-menu-symbolic")
+        .menu_model(&menu)
+        .tooltip_text("Menu principal")
+        .primary(true)
+        .build();
     let header = adw::HeaderBar::builder().show_title(false).build();
     header.pack_start(&title);
+    header.pack_end(&menu_button);
     header.pack_end(&home_button);
     header.pack_end(&sync_box);
 
@@ -182,6 +194,7 @@ pub fn build(app: &adw::Application, options: Options) {
         home_hint: App::hint(""),
         sync,
         updating_sync: Cell::new(false),
+        unused: RefCell::new(settings.unused().into_iter().collect()),
         settings,
         device_controls,
         diagram,
@@ -196,6 +209,10 @@ pub fn build(app: &adw::Application, options: Options) {
     app_state.build_home();
     app_state.build_device();
     app_state.connect();
+    app_state.add_actions();
+    app_state
+        .diagram
+        .set_hidden(app_state.unused.borrow().clone());
     app_state.show_sync_mode();
     app_state.show(options.page);
 
@@ -234,13 +251,36 @@ pub fn build(app: &adw::Application, options: Options) {
 
     window.present();
 
+    // o diálogo de conectores lista as zonas: abre depois que o backend respondeu
+    if let Some(dialog) = options.dialog {
+        let window = window.clone();
+        glib::timeout_add_local_once(Duration::from_millis(400), move || {
+            if let Err(e) = WidgetExt::activate_action(&window, &format!("win.{dialog}"), None) {
+                eprintln!("diálogo {dialog}: {e}");
+            }
+        });
+    }
+
     if let Some(path) = options.screenshot {
         let app = app.clone();
         let window = window.clone();
         glib::timeout_add_local_once(Duration::from_millis(1200), move || {
-            match crate::screenshot::save(&window, &path) {
-                Ok(()) => println!("captura salva em {path}"),
-                Err(message) => eprintln!("erro na captura: {message}"),
+            // a janela principal em ARQ; um diálogo aberto em janela própria, em ARQ-2.png
+            let others = gtk::Window::list_toplevels()
+                .into_iter()
+                .filter_map(|w| w.downcast::<gtk::Window>().ok())
+                .filter(|w| w.is_visible() && *w != *window.upcast_ref::<gtk::Window>());
+            let extra = |i: usize| match path.strip_suffix(".png") {
+                Some(stem) => format!("{stem}-{i}.png"),
+                None => format!("{path}-{i}"),
+            };
+            let shots = std::iter::once((path.clone(), window.clone().upcast::<gtk::Window>()))
+                .chain(others.enumerate().map(|(i, w)| (extra(i + 2), w)));
+            for (file, target) in shots {
+                match crate::screenshot::save(&target, &file) {
+                    Ok(()) => println!("captura salva em {file}"),
+                    Err(message) => eprintln!("erro na captura: {message}"),
+                }
             }
             app.quit();
         });
@@ -463,6 +503,105 @@ impl App {
         });
     }
 
+    // --- menu ---------------------------------------------------------------------------
+
+    fn add_actions(self: &Rc<Self>) {
+        let weak = Rc::downgrade(self);
+        let connectors = gio::ActionEntry::builder("connectors")
+            .activate(move |_: &adw::ApplicationWindow, _, _| {
+                if let Some(app) = weak.upgrade() {
+                    app.show_connectors();
+                }
+            })
+            .build();
+        let weak = Rc::downgrade(self);
+        let about = gio::ActionEntry::builder("about")
+            .activate(move |_: &adw::ApplicationWindow, _, _| {
+                if let Some(app) = weak.upgrade() {
+                    app.show_about();
+                }
+            })
+            .build();
+        self.window.add_action_entries([connectors, about]);
+    }
+
+    /// A placa não detecta o que está ligado: o usuário marca os conectores
+    /// em uso, e os vazios saem do desenho e dos ajustes da placa.
+    fn show_connectors(self: &Rc<Self>) {
+        let group = adw::PreferencesGroup::builder()
+            .title("Conectores de LED")
+            .description(
+                "A placa não tem como saber o que está ligado em cada conector. \
+                 Desligue os que estão vazios para tirá-los do desenho e dos ajustes da placa.",
+            )
+            .build();
+        for zone in self.zones.borrow().iter().filter(|z| Device::Board.owns(z)) {
+            let Some((label, place)) = diagram::connector(&zone.name) else {
+                continue;
+            };
+            let kind = match zone.kind {
+                Kind::Argb => format!("ARGB 5 V, {} LEDs", zone.leds),
+                _ => "RGB 12 V".to_owned(),
+            };
+            let row = adw::SwitchRow::builder()
+                .title(label)
+                .subtitle(format!("{kind} · {place}"))
+                .active(!self.unused.borrow().contains(&zone.name))
+                .build();
+            let weak = Rc::downgrade(self);
+            let name = zone.name.clone();
+            row.connect_active_notify(move |row| {
+                if let Some(app) = weak.upgrade() {
+                    app.set_connector_used(&name, row.is_active());
+                }
+            });
+            group.add(&row);
+        }
+        let page = adw::PreferencesPage::new();
+        page.add(&group);
+        let dialog = adw::PreferencesDialog::builder()
+            .title("Conectores da placa")
+            .content_width(420)
+            .content_height(470)
+            .build();
+        dialog.add(&page);
+        dialog.present(Some(&self.window));
+    }
+
+    fn set_connector_used(&self, name: &str, used: bool) {
+        {
+            let mut unused = self.unused.borrow_mut();
+            if used {
+                unused.remove(name);
+            } else {
+                unused.insert(name.to_owned());
+            }
+        }
+        let mut names: Vec<String> = self.unused.borrow().iter().cloned().collect();
+        names.sort();
+        self.settings.set_unused(&names);
+        self.diagram.set_hidden(self.unused.borrow().clone());
+        if self.on_device_page() {
+            self.sync_controls();
+        }
+    }
+
+    fn show_about(&self) {
+        let about = adw::AboutDialog::builder()
+            .application_name("AORUS RGB")
+            .version(env!("CARGO_PKG_VERSION"))
+            .developer_name("Caio Augusto")
+            .license_type(gtk::License::Gpl20)
+            .website("https://github.com/augustcaio/aorus-rgb")
+            .issue_url("https://github.com/augustcaio/aorus-rgb/issues")
+            .comments(
+                "Iluminação RGB da B550M AORUS ELITE e das memórias RGB no Linux.\n\n\
+                 Projeto independente, sem vínculo com a Gigabyte. AORUS é marca da Gigabyte.",
+            )
+            .build();
+        about.present(Some(&self.window));
+    }
+
     // --- sincronização -----------------------------------------------------------------
 
     /// Liga ou desliga o switch sem disparar `sync_toggled`.
@@ -541,7 +680,11 @@ impl App {
         self.zones
             .borrow()
             .iter()
-            .filter(|z| device.owns(z) && (selected.is_empty() || selected.contains(&z.name)))
+            .filter(|z| {
+                device.owns(z)
+                    && !self.unused.borrow().contains(&z.name)
+                    && (selected.is_empty() || selected.contains(&z.name))
+            })
             .cloned()
             .collect()
     }
