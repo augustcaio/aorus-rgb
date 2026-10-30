@@ -8,6 +8,7 @@
 mod backend;
 mod model;
 mod screenshot;
+mod settings;
 mod ui;
 
 use adw::prelude::*;

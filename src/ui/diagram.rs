@@ -49,24 +49,41 @@ pub fn led_colors(state: Option<&ZoneState>, leds: usize, t: f64) -> Vec<Color> 
             brightness,
             speed,
         }) => {
-            // velocidade do daemon: 0 rápido .. 9 lento
-            let period = 0.6 + f64::from(*speed) * 0.25;
+            // mesmos tempos que o daemon usa ao desenhar os efeitos
+            // (patterns.py; velocidade 0 rápido .. 9 lento)
+            let speed = f64::from(*speed);
             let v = f64::from(*brightness) / 255.0;
             let (r, g, b) = to_f64(*color);
             let scale = |k: f64| (r * k * v, g * k * v, b * k * v);
             match effect {
-                Effect::Pulse => vec![scale(0.5 - 0.5 * (t * 2.0 * PI / period).cos()); leds],
-                Effect::Flash => vec![
-                    scale(if (t / period).fract() < 0.15 {
-                        1.0
+                Effect::Pulse => {
+                    let ramp = pulse_ramp(speed);
+                    let x = t.rem_euclid(2.0 * ramp + 0.2);
+                    let level = if x < 2.0 * ramp {
+                        (1.0 - (PI * x / ramp).cos()) / 2.0
                     } else {
                         0.0
-                    });
-                    leds
-                ],
-                Effect::Cycle => vec![to_f64(hsv_to_rgb(t / (period * 6.0), 1.0, v)); leds],
+                    };
+                    vec![scale(level); leds]
+                }
+                Effect::Flash => {
+                    let period = 0.2 + (speed * 200.0 + 700.0) / 1000.0;
+                    let level = if t.rem_euclid(period) < 0.1 { 1.0 } else { 0.0 };
+                    vec![scale(level); leds]
+                }
+                Effect::Cycle => {
+                    let step = (speed * 100.0
+                        + 300.0
+                        + if speed > 8.0 {
+                            1300.0 * (speed - 8.0)
+                        } else {
+                            0.0
+                        })
+                        / 1000.0;
+                    vec![to_f64(hsv_to_rgb(t / (step * 7.0), 1.0, v)); leds]
+                }
                 Effect::Random => {
-                    let step = (t / (period / 2.0)).floor() as u64;
+                    let step = (t / (0.2 + speed * 0.1)).floor() as u64;
                     (0..leds)
                         .map(|i| {
                             let hash = (step.wrapping_mul(2_654_435_761)
@@ -79,6 +96,15 @@ pub fn led_colors(state: Option<&ZoneState>, leds: usize, t: f64) -> Vec<Color> 
                 _ => vec![scale(1.0); leds],
             }
         }
+    }
+}
+
+/// Segundos para acender (e para apagar) no pulso.
+fn pulse_ramp(speed: f64) -> f64 {
+    if speed <= 6.0 {
+        (400.0 + speed * 100.0) / 1000.0
+    } else {
+        (1000.0 + (speed - 6.0) * 200.0) / 1000.0
     }
 }
 
@@ -521,7 +547,9 @@ mod tests {
             speed: 0,
         };
         let dark = led_colors(Some(&state), 1, 0.0)[0].0;
-        let bright = led_colors(Some(&state), 1, 0.3)[0].0;
-        assert!(dark < 0.01 && bright > 0.99);
+        // velocidade 0: acende em 0,4 s, apaga em 0,4 s e fica 0,2 s apagado
+        let bright = led_colors(Some(&state), 1, 0.4)[0].0;
+        let off = led_colors(Some(&state), 1, 0.9)[0].0;
+        assert!(dark < 0.01 && bright > 0.99 && off < 0.01);
     }
 }

@@ -113,5 +113,26 @@ window.aorus button.square-action {
 }
 window.aorus button.square-action:hover { background: #4a4a4a; }
 
+/* títulos de seção na mesma altura, com ou sem controle ao lado */
+.section-title { min-height: 22px; }
+
+/* switch de pílula compacto, no laranja do tema quando ligado */
+window.aorus switch {
+  min-width: 34px;
+  min-height: 18px;
+  padding: 2px;
+  border-radius: 999px;
+  background: #3a3a3a;
+}
+window.aorus switch:checked { background: #e8641b; }
+window.aorus switch slider {
+  min-width: 14px;
+  min-height: 14px;
+  margin: 0;
+  border-radius: 999px;
+  background: #f2f2f2;
+  box-shadow: none;
+}
+
 .diagram-hint { color: #6f6f6f; font-size: 10px; }
 "#;

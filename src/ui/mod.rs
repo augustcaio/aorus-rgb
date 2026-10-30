@@ -1,6 +1,8 @@
 //! Janela principal, no arranjo do RGB Fusion 2.0:
-//! - início: dispositivos, efeitos e cor; muda tudo junto (sincronizado);
-//! - dispositivo: desenho com as zonas; muda as zonas selecionadas.
+//! - início: dispositivos, efeitos e cor; com "Sincronizar" ligado, muda todos
+//!   os dispositivos juntos; desligado, cada um é ajustado na própria tela;
+//! - dispositivo: desenho com as zonas; muda as zonas selecionadas (e desliga a
+//!   sincronização, porque os dispositivos deixam de ter o mesmo efeito).
 
 mod art;
 mod controls;
@@ -20,6 +22,7 @@ use gtk::glib;
 use crate::Options;
 use crate::backend::Backend;
 use crate::model::{Device, Effect, Look, Zone, ZoneState};
+use crate::settings::Settings;
 use controls::Controls;
 
 // grade: margens de 12, colunas separadas por 18 (múltiplos de 6, como o libadwaita)
@@ -87,6 +90,10 @@ struct App {
     toasts: adw::ToastOverlay,
     banner: adw::Banner,
     home_controls: Rc<Controls>,
+    home_hint: gtk::Label,
+    sync: gtk::Switch,
+    updating_sync: Cell<bool>,
+    settings: Settings,
     device_controls: Rc<Controls>,
     diagram: Rc<Diagram>,
     rail: Vec<(Device, gtk::Button)>,
@@ -150,6 +157,13 @@ pub fn build(app: &adw::Application, options: Options) {
         })
         .collect();
 
+    let settings = Settings::load(!options.mock);
+    let sync = gtk::Switch::builder()
+        .active(settings.sync())
+        .valign(gtk::Align::Center)
+        .tooltip_text("Aplica o mesmo efeito em todos os dispositivos")
+        .build();
+
     let app_state = Rc::new(App {
         window: window.clone(),
         backend: RefCell::new(None),
@@ -159,6 +173,10 @@ pub fn build(app: &adw::Application, options: Options) {
         toasts,
         banner,
         home_controls,
+        home_hint: App::hint(""),
+        sync,
+        updating_sync: Cell::new(false),
+        settings,
         device_controls,
         diagram,
         rail,
@@ -172,6 +190,7 @@ pub fn build(app: &adw::Application, options: Options) {
     app_state.build_home();
     app_state.build_device();
     app_state.connect();
+    app_state.show_sync_mode();
     app_state.show(options.page);
 
     // a janela mantém o estado vivo; os callbacks guardam só referências fracas
@@ -227,13 +246,30 @@ impl App {
 
     /// Título da coluna e conteúdo, alinhados no topo e à esquerda.
     fn section(title: &str, child: &impl IsA<gtk::Widget>) -> gtk::Box {
+        Self::section_with(title, None, child)
+    }
+
+    /// Seção com um controle à direita do título (ex.: o switch de sincronizar).
+    /// Todos os títulos têm a mesma altura, então as colunas seguem alinhadas.
+    fn section_with(
+        title: &str,
+        suffix: Option<&gtk::Widget>,
+        child: &impl IsA<gtk::Widget>,
+    ) -> gtk::Box {
         let label = gtk::Label::new(Some(title));
         label.add_css_class("caption-heading");
         label.add_css_class("dim-label");
         label.set_xalign(0.0);
+        label.set_hexpand(true);
+        let header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        header.add_css_class("section-title");
+        header.append(&label);
+        if let Some(suffix) = suffix {
+            header.append(suffix);
+        }
         let section = gtk::Box::new(gtk::Orientation::Vertical, 6);
         section.set_valign(gtk::Align::Start);
-        section.append(&label);
+        section.append(&header);
         section.append(child);
         section
     }
@@ -261,9 +297,9 @@ impl App {
         page
     }
 
-    /// Rodapé: dica à esquerda e, se houver, ações à direita.
-    fn footer(hint: &str, actions: Option<&gtk::Box>) -> gtk::Box {
-        let label = gtk::Label::new(Some(hint));
+    /// Dica do rodapé.
+    fn hint(text: &str) -> gtk::Label {
+        let label = gtk::Label::new(Some(text));
         label.add_css_class("caption");
         label.add_css_class("dim-label");
         label.set_xalign(0.0);
@@ -271,8 +307,13 @@ impl App {
         label.set_hexpand(true);
         // largura natural curta: a dica quebra linha em vez de alargar a janela
         label.set_max_width_chars(40);
+        label
+    }
+
+    /// Rodapé: dica à esquerda e, se houver, ações à direita.
+    fn footer(hint: &gtk::Label, actions: Option<&gtk::Box>) -> gtk::Box {
         let footer = gtk::Box::new(gtk::Orientation::Horizontal, MARGIN);
-        footer.append(&label);
+        footer.append(hint);
         if let Some(actions) = actions {
             footer.append(actions);
         }
@@ -316,11 +357,14 @@ impl App {
             tiles.attach(&tile, column as i32, row as i32, 1, 1);
         }
 
-        let left = Self::section("Dispositivos", &tiles);
-        let footer = Self::footer(
-            "Sincronizado: as mudanças valem para todos os dispositivos. Clique num dispositivo para ajustar cada zona.",
-            None,
-        );
+        let sync_label = gtk::Label::new(Some("Sincronizar"));
+        sync_label.add_css_class("caption");
+        sync_label.add_css_class("dim-label");
+        let sync = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        sync.append(&sync_label);
+        sync.append(&self.sync);
+        let left = Self::section_with("Dispositivos", Some(sync.upcast_ref()), &tiles);
+        let footer = Self::footer(&self.home_hint, None);
         self.stack.add_named(
             &Self::page(&left, &self.home_controls, &footer),
             Some("home"),
@@ -384,7 +428,9 @@ impl App {
         let left = Self::section("Zonas", &zones);
         left.set_width_request(LEFT_WIDTH);
         let footer = Self::footer(
-            "Clique numa zona para selecioná-la; sem seleção, vale para o dispositivo inteiro.",
+            &Self::hint(
+                "Clique numa zona para selecioná-la; sem seleção, vale para o dispositivo inteiro.",
+            ),
             Some(&actions),
         );
         self.stack.add_named(
@@ -409,8 +455,21 @@ impl App {
         let weak = Rc::downgrade(self);
         self.device_controls.connect_change(move |look| {
             if let Some(app) = weak.upgrade() {
+                // ajustar um dispositivo sozinho desfaz a sincronização
+                if app.sync.is_active() {
+                    app.set_sync(false);
+                    app.toast("Sincronização desligada: este ajuste vale só para este dispositivo");
+                }
                 let targets = app.targets(look.effect);
                 app.send(targets, look);
+            }
+        });
+        let weak = Rc::downgrade(self);
+        self.sync.connect_active_notify(move |switch| {
+            if let Some(app) = weak.upgrade()
+                && !app.updating_sync.get()
+            {
+                app.sync_toggled(switch.is_active());
             }
         });
         let weak = Rc::downgrade(self);
@@ -418,6 +477,40 @@ impl App {
             if let Some(app) = weak.upgrade() {
                 app.sync_controls();
             }
+        });
+    }
+
+    // --- sincronização -----------------------------------------------------------------
+
+    /// Liga ou desliga o switch sem disparar `sync_toggled`.
+    fn set_sync(&self, sync: bool) {
+        self.updating_sync.set(true);
+        self.sync.set_active(sync);
+        self.updating_sync.set(false);
+        self.settings.set_sync(sync);
+        self.show_sync_mode();
+    }
+
+    fn sync_toggled(self: &Rc<Self>, sync: bool) {
+        self.settings.set_sync(sync);
+        self.show_sync_mode();
+        if sync {
+            // religar: todos os dispositivos voltam a ter o efeito da tela inicial
+            self.send(vec!["all".to_owned()], self.home_controls.look());
+            self.toast("Sincronizado: todos os dispositivos com o mesmo efeito");
+        }
+    }
+
+    /// Sem sincronização, os controles da tela inicial ficam inativos: cada
+    /// dispositivo é ajustado na própria tela.
+    fn show_sync_mode(&self) {
+        let sync = self.sync.is_active();
+        self.home_controls.effects.set_sensitive(sync);
+        self.home_controls.panel.set_sensitive(sync);
+        self.home_hint.set_label(if sync {
+            "Sincronizado: as mudanças valem para todos os dispositivos. Clique num dispositivo para ajustar cada zona."
+        } else {
+            "Sincronização desligada: cada dispositivo tem o próprio efeito. Clique num dispositivo para ajustá-lo."
         });
     }
 
