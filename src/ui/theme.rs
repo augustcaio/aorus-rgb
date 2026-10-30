@@ -3,7 +3,6 @@
 
 pub const ORANGE: (f64, f64, f64) = (0.910, 0.392, 0.106); // #e8641b
 pub const GRAY: (f64, f64, f64) = (0.55, 0.55, 0.55);
-pub const DIM: (f64, f64, f64) = (0.16, 0.16, 0.16);
 
 pub const CSS: &str = r#"
 @define-color accent_bg_color #e8641b;

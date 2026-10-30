@@ -383,7 +383,7 @@ impl App {
         let left = Self::section("Zonas", &zones);
         left.set_width_request(LEFT_WIDTH);
         let footer = Self::footer(
-            "Clique numa zona para selecioná-la; sem seleção, vale para o dispositivo inteiro. Posições ilustrativas.",
+            "Clique numa zona para selecioná-la; sem seleção, vale para o dispositivo inteiro.",
             Some(&actions),
         );
         self.stack.add_named(
