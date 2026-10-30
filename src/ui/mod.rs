@@ -19,7 +19,16 @@ use gtk::glib;
 use crate::Options;
 use crate::backend::Backend;
 use crate::model::{Device, Effect, Look, Zone, ZoneState};
-use controls::Controls;
+use controls::{COLOR_WIDTH, Controls, EFFECTS_WIDTH};
+
+// grade: margens de 12, colunas separadas por 18 (múltiplos de 6, como o libadwaita)
+const MARGIN: i32 = 12;
+const COLUMN_GAP: i32 = 18;
+const LEFT_WIDTH: i32 = 358;
+const RAIL_SIZE: i32 = 24;
+const DIAGRAM_WIDTH: i32 = LEFT_WIDTH - 40 - MARGIN;
+const DIAGRAM_HEIGHT: i32 = 300;
+const WINDOW_WIDTH: i32 = MARGIN * 2 + LEFT_WIDTH + EFFECTS_WIDTH + COLOR_WIDTH + COLUMN_GAP * 2;
 use diagram::Diagram;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -114,8 +123,8 @@ pub fn build(app: &adw::Application, options: Options) {
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title("AORUS RGB")
-        .default_width(900)
-        .default_height(540)
+        .default_width(WINDOW_WIDTH)
+        .default_height(470)
         .content(&toasts)
         .build();
     window.add_css_class("aorus");
@@ -123,7 +132,7 @@ pub fn build(app: &adw::Application, options: Options) {
     let rail: Vec<(Device, gtk::Button)> = Device::ALL
         .into_iter()
         .map(|device| {
-            let icon = icons::area(32, move |cr, size| {
+            let icon = icons::area(RAIL_SIZE, move |cr, size| {
                 icons::device(cr, device, size, (0.92, 0.92, 0.92), false)
             });
             let button = gtk::Button::builder()
@@ -210,31 +219,79 @@ pub fn build(app: &adw::Application, options: Options) {
 impl App {
     // --- montagem -------------------------------------------------------------------
 
-    fn build_home(self: &Rc<Self>) {
-        let tiles = gtk::FlowBox::builder()
-            .max_children_per_line(3)
-            .min_children_per_line(3)
-            .selection_mode(gtk::SelectionMode::None)
-            .column_spacing(12)
-            .row_spacing(12)
+    /// Título da coluna e conteúdo, alinhados no topo e à esquerda.
+    fn section(title: &str, child: &impl IsA<gtk::Widget>) -> gtk::Box {
+        let label = gtk::Label::new(Some(title));
+        label.add_css_class("caption-heading");
+        label.add_css_class("dim-label");
+        label.set_xalign(0.0);
+        let section = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        section.set_valign(gtk::Align::Start);
+        section.append(&label);
+        section.append(child);
+        section
+    }
+
+    /// Três colunas (dispositivo/zonas, efeito, cor) e o rodapé, na mesma grade.
+    fn page(left: &gtk::Box, controls: &Controls, footer: &gtk::Box) -> gtk::Box {
+        left.set_width_request(LEFT_WIDTH);
+        let columns = gtk::Box::builder()
+            .spacing(COLUMN_GAP)
+            .vexpand(true)
             .valign(gtk::Align::Start)
-            .hexpand(true)
             .build();
-        for device in Device::ALL {
-            let icon = icons::area(72, move |cr, size| {
+        columns.append(left);
+        columns.append(&Self::section("Efeito", &controls.effects));
+        columns.append(&Self::section("Cor", &controls.panel));
+        let page = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(MARGIN)
+            .margin_top(MARGIN)
+            .margin_bottom(MARGIN)
+            .margin_start(MARGIN)
+            .margin_end(MARGIN)
+            .build();
+        page.append(&columns);
+        page.append(footer);
+        page
+    }
+
+    /// Rodapé: dica à esquerda e, se houver, ações à direita.
+    fn footer(hint: &str, actions: Option<&gtk::Box>) -> gtk::Box {
+        let label = gtk::Label::new(Some(hint));
+        label.add_css_class("caption");
+        label.add_css_class("dim-label");
+        label.set_xalign(0.0);
+        label.set_wrap(true);
+        label.set_hexpand(true);
+        let footer = gtk::Box::new(gtk::Orientation::Horizontal, MARGIN);
+        footer.append(&label);
+        if let Some(actions) = actions {
+            footer.append(actions);
+        }
+        footer
+    }
+
+    fn build_home(self: &Rc<Self>) {
+        let tiles = gtk::Grid::builder()
+            .column_spacing(MARGIN)
+            .column_homogeneous(true)
+            .build();
+        for (i, device) in Device::ALL.into_iter().enumerate() {
+            let icon = icons::area(64, move |cr, size| {
                 icons::device(cr, device, size, theme::ORANGE, true)
             });
             let frame = gtk::Button::builder()
                 .child(&icon)
                 .tooltip_text(format!("Ajustar {}", device.label()))
+                .height_request(104)
                 .build();
             frame.add_css_class("device-tile");
             let name = gtk::Label::new(Some(device.label()));
+            name.add_css_class("caption");
             name.add_css_class("tile-label");
+            name.set_ellipsize(gtk::pango::EllipsizeMode::End);
             let tile = gtk::Box::new(gtk::Orientation::Vertical, 6);
-            // quadro quadrado, com o pictograma no centro, como no RGB Fusion
-            tile.set_halign(gtk::Align::Start);
-            frame.set_halign(gtk::Align::Center);
             tile.append(&frame);
             tile.append(&name);
             let weak = Rc::downgrade(self);
@@ -246,33 +303,24 @@ impl App {
                     });
                 }
             });
-            tiles.insert(&tile, -1);
+            tiles.attach(&tile, i as i32, 0, 1, 1);
         }
+        // terceira coluna vazia: mantém os quadros do mesmo tamanho da grade 3 x N
+        tiles.attach(&gtk::Box::new(gtk::Orientation::Horizontal, 0), 2, 0, 1, 1);
 
-        let hint = gtk::Label::new(Some(
-            "Sincronizado: efeito e cor valem para todos os dispositivos.\nClique num dispositivo para ajustar cada zona.",
-        ));
-        hint.add_css_class("diagram-hint");
-        hint.set_xalign(0.0);
-        let left = gtk::Box::new(gtk::Orientation::Vertical, 12);
-        left.append(&tiles);
-        left.append(&hint);
-
-        let page = gtk::Box::builder()
-            .spacing(18)
-            .margin_top(18)
-            .margin_bottom(18)
-            .margin_start(20)
-            .margin_end(20)
-            .build();
-        page.append(&left);
-        page.append(&self.home_controls.effects);
-        page.append(&self.home_controls.panel);
-        self.stack.add_named(&page, Some("home"));
+        let left = Self::section("Dispositivos", &tiles);
+        let footer = Self::footer(
+            "Sincronizado: as mudanças valem para todos os dispositivos. Clique num dispositivo para ajustar cada zona.",
+            None,
+        );
+        self.stack.add_named(
+            &Self::page(&left, &self.home_controls, &footer),
+            Some("home"),
+        );
     }
 
     fn build_device(self: &Rc<Self>) {
-        let rail = gtk::Box::new(gtk::Orientation::Vertical, 10);
+        let rail = gtk::Box::new(gtk::Orientation::Vertical, 6);
         for (device, button) in &self.rail {
             let weak = Rc::downgrade(self);
             let device = *device;
@@ -286,38 +334,28 @@ impl App {
             });
             rail.append(button);
         }
+        self.diagram.area.set_hexpand(false);
+        self.diagram.area.set_vexpand(false);
+        self.diagram
+            .area
+            .set_size_request(DIAGRAM_WIDTH, DIAGRAM_HEIGHT);
+        let zones = gtk::Box::new(gtk::Orientation::Horizontal, MARGIN);
+        zones.append(&rail);
+        zones.append(&self.diagram.area);
 
-        let hint = gtk::Label::new(Some(
-            "Clique numa zona para selecioná-la (clique de novo para tirar). Sem seleção, vale para o dispositivo inteiro.\nPosições dos conectores ilustrativas.",
-        ));
-        hint.add_css_class("diagram-hint");
-        hint.set_wrap(true);
-        let center = gtk::Box::new(gtk::Orientation::Vertical, 4);
-        center.set_hexpand(true);
-        center.append(&self.diagram.area);
-        center.append(&hint);
-
-        let apply = gtk::Button::with_label("APLICAR");
+        let apply = gtk::Button::with_label("Aplicar");
         apply.add_css_class("square-action");
         apply.set_tooltip_text(Some(
-            "Fixa o estado atual como ponto de partida do REDEFINIR",
+            "Fixa o estado atual como ponto de partida do Redefinir",
         ));
-        let reset = gtk::Button::with_label("REDEFINIR");
+        let reset = gtk::Button::with_label("Redefinir");
         reset.add_css_class("square-action");
         reset.set_tooltip_text(Some(
             "Volta as zonas ao estado de quando esta tela foi aberta",
         ));
-        let actions = gtk::Box::builder()
-            .spacing(8)
-            .halign(gtk::Align::End)
-            .valign(gtk::Align::End)
-            .vexpand(true)
-            .build();
+        let actions = gtk::Box::new(gtk::Orientation::Horizontal, 6);
         actions.append(&apply);
         actions.append(&reset);
-        let right = gtk::Box::new(gtk::Orientation::Vertical, 0);
-        right.append(&self.device_controls.panel);
-        right.append(&actions);
 
         let weak = Rc::downgrade(self);
         apply.connect_clicked(move |_| {
@@ -335,18 +373,15 @@ impl App {
             }
         });
 
-        let page = gtk::Box::builder()
-            .spacing(14)
-            .margin_top(14)
-            .margin_bottom(14)
-            .margin_start(14)
-            .margin_end(18)
-            .build();
-        page.append(&rail);
-        page.append(&center);
-        page.append(&self.device_controls.effects);
-        page.append(&right);
-        self.stack.add_named(&page, Some("device"));
+        let left = Self::section("Zonas", &zones);
+        let footer = Self::footer(
+            "Clique numa zona para selecioná-la; sem seleção, vale para o dispositivo inteiro. Posições ilustrativas.",
+            Some(&actions),
+        );
+        self.stack.add_named(
+            &Self::page(&left, &self.device_controls, &footer),
+            Some("device"),
+        );
     }
 
     fn connect(self: &Rc<Self>) {

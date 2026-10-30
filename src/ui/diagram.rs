@@ -314,8 +314,9 @@ impl Diagram {
 
     fn draw_board(&self, cr: &Context, w: f64, h: f64, t: f64) {
         // Micro-ATX: 244 x 244 mm, quase quadrada
-        let side = (w - 150.0).min(h - 84.0).max(100.0);
-        let (bx, by) = ((w - side) / 2.0, (h - side) / 2.0);
+        let side = (w - 64.0).min(h - 76.0).max(80.0);
+        // sobra à direita para a barra do LED_CPU
+        let (bx, by) = ((w - 30.0 - side) / 2.0, (h - side) / 2.0);
         let u = |fx: f64, fy: f64, fw: f64, fh: f64| {
             (bx + fx * side, by + fy * side, fw * side, fh * side)
         };
@@ -415,11 +416,11 @@ impl Diagram {
             let _ = cr.show_text("Nenhuma memória RGB detectada pelo daemon");
             return;
         }
-        let stick_w = (w - 120.0).clamp(160.0, 420.0);
+        let stick_w = (w - 40.0).clamp(140.0, 300.0);
         let stick_h = stick_w * 0.24;
         let gap = stick_h * 1.1;
         let total = names.len() as f64 * stick_h + (names.len() as f64 - 1.0) * gap;
-        let x = (w - stick_w) / 2.0 + 40.0;
+        let x = (w - stick_w) / 2.0 + 8.0;
         let mut y = (h - total) / 2.0;
         for name in &names {
             // pente: placa de circuito, chips e contatos

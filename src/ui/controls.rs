@@ -1,5 +1,5 @@
 //! Coluna de efeitos e painel de cor (roda, cores rápidas, RGB/hex, sliders),
-//! no arranjo do RGB Fusion 2.0.
+//! no arranjo do RGB Fusion 2.0 e numa grade alinhada (espaçamentos de 6 px).
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -10,6 +10,11 @@ use super::icons;
 use super::theme::{GRAY, ORANGE};
 use super::wheel::Wheel;
 use crate::model::{Effect, Look, Rgb, SPEED_MAX, SPEED_MIN};
+
+pub const EFFECTS_WIDTH: i32 = 176;
+pub const COLOR_WIDTH: i32 = 196;
+const WHEEL_SIZE: i32 = 132;
+const LABEL_WIDTH: i32 = 64;
 
 /// Cores rápidas, como a fileira abaixo da roda do RGB Fusion.
 const SWATCHES: [Rgb; 8] = [
@@ -41,60 +46,87 @@ pub struct Controls {
     rgb: [gtk::Entry; 3],
     hex: gtk::Entry,
     speed: gtk::Scale,
+    speed_value: gtk::Label,
     brightness: gtk::Scale,
+    brightness_value: gtk::Label,
     look: Cell<Look>,
     updating: Cell<bool>,
     on_change: RefCell<Option<ChangeHandler>>,
 }
 
-fn label(text: &str, class: &str) -> gtk::Label {
+fn caption(text: &str) -> gtk::Label {
     let label = gtk::Label::new(Some(text));
-    label.add_css_class(class);
+    label.add_css_class("caption");
     label.set_xalign(0.0);
     label
 }
 
-fn scale(min: f64, max: f64) -> gtk::Scale {
+fn entry(chars: i32) -> gtk::Entry {
+    let entry = gtk::Entry::builder()
+        .max_width_chars(chars)
+        .width_chars(chars)
+        .hexpand(true)
+        .build();
+    entry.add_css_class("rgb-entry");
+    entry
+}
+
+/// Linha de slider alinhada em grade: rótulo | slider | valor.
+fn slider_row(
+    grid: &gtk::Grid,
+    row: i32,
+    name: &str,
+    min: f64,
+    max: f64,
+) -> (gtk::Scale, gtk::Label) {
+    let label = caption(name);
+    label.set_width_request(LABEL_WIDTH);
     let scale = gtk::Scale::with_range(gtk::Orientation::Horizontal, min, max, 1.0);
     scale.set_draw_value(false);
     scale.set_hexpand(true);
-    scale
+    let value = caption("");
+    value.add_css_class("numeric");
+    value.set_xalign(1.0);
+    value.set_width_chars(3);
+    grid.attach(&label, 0, row, 1, 1);
+    grid.attach(&scale, 1, row, 1, 1);
+    grid.attach(&value, 2, row, 1, 1);
+    (scale, value)
 }
 
 impl Controls {
     pub fn new() -> Rc<Self> {
+        // efeitos: grade 2 x 4 de células iguais
         let effects = gtk::Grid::builder()
-            .row_spacing(2)
-            .column_spacing(2)
+            .row_spacing(6)
+            .column_spacing(6)
+            .column_homogeneous(true)
             .valign(gtk::Align::Start)
+            .width_request(EFFECTS_WIDTH)
             .build();
         let mut buttons = Vec::new();
         for (i, effect) in Effect::ALL.into_iter().enumerate() {
             let selected = Rc::new(Cell::new(false));
             let flag = selected.clone();
-            let icon = icons::area(28, move |cr, size| {
+            let icon = icons::area(24, move |cr, size| {
                 icons::effect(cr, effect, size, if flag.get() { ORANGE } else { GRAY });
             });
-            let text = gtk::Label::new(Some(effect.label()));
+            icon.set_halign(gtk::Align::Center);
+            let text = caption(effect.label());
+            text.set_xalign(0.5);
             text.add_css_class("effect-label");
-            text.set_wrap(true);
-            text.set_justify(gtk::Justification::Center);
-            text.set_max_width_chars(9);
-            let content = gtk::Box::new(gtk::Orientation::Vertical, 1);
+            let content = gtk::Box::new(gtk::Orientation::Vertical, 4);
+            content.set_valign(gtk::Align::Center);
             content.append(&icon);
             content.append(&text);
             let button = gtk::Button::builder()
                 .child(&content)
                 .tooltip_text(effect.label())
+                .height_request(54)
                 .build();
             button.add_css_class("effect-button");
-            // ESTÁTICO e DESLIGADO lado a lado; os demais numa coluna, como no RGB Fusion
-            let (column, row) = if i < 2 {
-                (i as i32, 0)
-            } else {
-                (0, i as i32 - 1)
-            };
-            effects.attach(&button, column, row, 1, 1);
+            let i = i as i32;
+            effects.attach(&button, i % 2, i / 2, 1, 1);
             buttons.push(EffectButton {
                 effect,
                 button,
@@ -103,39 +135,51 @@ impl Controls {
             });
         }
 
-        let panel = gtk::Box::new(gtk::Orientation::Vertical, 7);
-        panel.set_width_request(200);
-        let wheel = Wheel::new(150);
+        // cor: roda, cores rápidas, RGB/hex e sliders, todos na largura do painel
+        let panel = gtk::Box::new(gtk::Orientation::Vertical, 12);
+        panel.set_width_request(COLOR_WIDTH);
+        panel.set_valign(gtk::Align::Start);
+        let wheel = Wheel::new(WHEEL_SIZE);
         wheel.area.set_halign(gtk::Align::Center);
         panel.append(&wheel.area);
 
-        let swatches = gtk::Box::new(gtk::Orientation::Horizontal, 4);
-        swatches.set_halign(gtk::Align::Center);
+        let swatches = gtk::Box::builder().spacing(4).homogeneous(true).build();
         panel.append(&swatches);
 
-        let rgb_row = gtk::Box::new(gtk::Orientation::Horizontal, 3);
-        let entry = |chars: i32| {
-            let entry = gtk::Entry::builder()
-                .max_width_chars(chars)
-                .width_chars(chars)
-                .build();
-            entry.add_css_class("rgb-entry");
-            entry
-        };
+        let fields = gtk::Grid::builder()
+            .row_spacing(6)
+            .column_spacing(6)
+            .build();
         let rgb = [entry(3), entry(3), entry(3)];
-        let hex = entry(7);
-        for (name, widget) in [("R", &rgb[0]), ("G", &rgb[1]), ("B", &rgb[2]), ("#", &hex)] {
-            rgb_row.append(&label(name, "rgb-label"));
-            rgb_row.append(widget);
+        for (i, (name, widget)) in [("R", &rgb[0]), ("G", &rgb[1]), ("B", &rgb[2])]
+            .into_iter()
+            .enumerate()
+        {
+            let label = caption(name);
+            label.add_css_class("rgb-label");
+            fields.attach(&label, i as i32 * 2, 0, 1, 1);
+            fields.attach(widget, i as i32 * 2 + 1, 0, 1, 1);
         }
-        panel.append(&rgb_row);
+        let hex = entry(7);
+        let hash = caption("#");
+        hash.add_css_class("rgb-label");
+        fields.attach(&hash, 0, 1, 1, 1);
+        fields.attach(&hex, 1, 1, 5, 1);
+        panel.append(&fields);
 
-        let speed = scale(f64::from(SPEED_MIN), f64::from(SPEED_MAX));
-        let brightness = scale(0.0, 255.0);
-        panel.append(&label("Velocidade", "panel-label"));
-        panel.append(&speed);
-        panel.append(&label("Brilho", "panel-label"));
-        panel.append(&brightness);
+        let sliders = gtk::Grid::builder()
+            .row_spacing(6)
+            .column_spacing(6)
+            .build();
+        let (speed, speed_value) = slider_row(
+            &sliders,
+            0,
+            "Velocidade",
+            f64::from(SPEED_MIN),
+            f64::from(SPEED_MAX),
+        );
+        let (brightness, brightness_value) = slider_row(&sliders, 1, "Brilho", 0.0, 255.0);
+        panel.append(&sliders);
 
         let controls = Rc::new(Self {
             effects,
@@ -146,7 +190,9 @@ impl Controls {
             rgb,
             hex,
             speed,
+            speed_value,
             brightness,
+            brightness_value,
             look: Cell::new(Look::default()),
             updating: Cell::new(false),
             on_change: RefCell::new(None),
@@ -175,15 +221,18 @@ impl Controls {
         });
 
         for color in SWATCHES {
-            let area = icons::area(10, move |cr, _| {
+            let area = gtk::DrawingArea::builder()
+                .content_height(12)
+                .hexpand(true)
+                .build();
+            area.set_draw_func(move |_, cr, _, _| {
                 let (r, g, b) = color.to_f64();
                 cr.set_source_rgb(r, g, b);
                 let _ = cr.paint();
             });
-            area.set_content_width(18);
             let button = gtk::Button::builder()
                 .child(&area)
-                .tooltip_text(format!("#{}", color.hex()))
+                .tooltip_text(format!("#{}", color.hex().to_uppercase()))
                 .build();
             button.add_css_class("swatch");
             let weak = Rc::downgrade(self);
@@ -258,7 +307,10 @@ impl Controls {
         }
         self.hex.set_text(&look.color.hex().to_uppercase());
         self.speed.set_value(f64::from(look.speed));
+        self.speed_value.set_label(&look.speed.to_string());
         self.brightness.set_value(f64::from(look.brightness));
+        self.brightness_value
+            .set_label(&look.brightness.to_string());
         let color_on = look.effect.uses_color();
         self.wheel.area.set_sensitive(color_on);
         self.swatches.set_sensitive(color_on);

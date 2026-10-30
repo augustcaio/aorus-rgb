@@ -44,7 +44,7 @@ window.aorus button.rail-tile {
   background: #0b0b0b;
   border: 1px solid #4a4a4a;
   border-radius: 1px;
-  padding: 3px;
+  padding: 6px;
 }
 window.aorus button.rail-tile.selected { border: 2px solid #e8641b; }
 
@@ -55,8 +55,9 @@ window.aorus button.rail-tile.selected { border: 2px solid #e8641b; }
   padding: 1px 3px;
   min-height: 0;
 }
-.effect-button:hover { background: alpha(#ffffff, 0.04); }
-.effect-label { color: #8c8c8c; font-size: 9px; font-weight: 700; }
+.effect-button:hover { background: alpha(#ffffff, 0.05); }
+.effect-button.selected { background: alpha(#e8641b, 0.14); }
+.effect-label { color: #8c8c8c; font-weight: 700; }
 .effect-button.selected .effect-label { color: #e8641b; }
 .effect-button:disabled .effect-label { color: #444444; }
 

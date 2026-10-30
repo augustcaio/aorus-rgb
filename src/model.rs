@@ -127,13 +127,13 @@ impl Effect {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Static => "ESTÁTICO",
-            Self::Off => "DESLIGADO",
-            Self::Pulse => "PULSO",
-            Self::Flash => "FLASH",
-            Self::Cycle => "CICLO DE CORES",
-            Self::Random => "ALEATÓRIO",
-            Self::Rainbow => "ARCO-ÍRIS",
+            Self::Static => "Estático",
+            Self::Off => "Desligado",
+            Self::Pulse => "Pulso",
+            Self::Flash => "Flash",
+            Self::Cycle => "Ciclo de cores",
+            Self::Random => "Aleatório",
+            Self::Rainbow => "Arco-íris",
         }
     }
 
