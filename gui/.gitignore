@@ -1,0 +1,2 @@
+# a compilação usa CARGO_TARGET_DIR=~/.cache/aorus-rgb/target; isto é só uma garantia
+/target
