@@ -5,7 +5,7 @@ from aorus_rgb import ene
 from aorus_rgb.config import MemoryConfig
 from aorus_rgb.dram import DramController
 from aorus_rgb.engine import Engine, parse_hex
-from aorus_rgb.patterns import rainbow_frame
+from aorus_rgb.patterns import effect_frame, pulse_ramp, rainbow_frame
 
 
 class FakeClock:
@@ -156,11 +156,12 @@ def test_zones_with_the_same_speed_stay_in_phase(engine, transport, bus, clock):
     assert dram_led1(bus, 0) == expected
 
 
-def test_memory_gets_every_second_frame(engine, transport, bus):
+def test_memory_gets_every_second_frame(engine, transport, bus, clock):
     engine.set_rainbow("all")
     transport.sent.clear()
     bus.log.clear()
     for _ in range(4):
+        clock.now += 0.1
         engine.tick()
     assert len(board_frames(transport, 0x58)) == 4
     assert len([e for e in bus.log if e[:3] == ("block", 0x70, 0x03)]) == 2
@@ -249,9 +250,61 @@ def test_parse_hex():
         parse_hex("fff")
 
 
-def test_memory_mode_registers_on_effect(engine, bus):
-    engine.set_effect("dram", "pulse", "00ff00")
-    assert bus.chips[0].regs[ene.REG_MODE] == ene.MODES["breathing"]
+def test_static_effect_stays_in_hardware(engine, bus):
+    engine.set_effect("dram", "static", "00ff00")
+    assert bus.chips[0].regs[ene.REG_MODE] == ene.MODES["static"]
+    assert engine.animated == []
+
+
+@pytest.mark.parametrize("effect", ["pulse", "flash", "cycle", "random"])
+def test_effects_are_drawn_in_sync_on_board_and_memory(engine, transport, bus, clock, effect):
+    """Regressão: com os modos de hardware, as memórias saíam de fase com as fans."""
+    engine.set_effect("all", effect, "00ff00", 255, 5)
+    assert engine.animated == list(engine.zones)
+    for dt in (0.35, 0.8, 1.6, 2.9):
+        clock.now += dt
+        engine.frame = 0                   # quadro par: todas as zonas
+        engine.tick()
+        expected = effect_frame(effect, 8, clock.now - engine.t0, (0, 255, 0), 255, 5)[0]
+        assert dram_led1(bus, 0) == expected
+        assert dram_led1(bus, 1) == expected
+        board = board_frames(transport, 0x58)
+        if board:
+            assert led1_grb_to_rgb(board[-1]) == expected
+
+
+def test_pulse_breathes_from_dark_to_full(engine, bus, clock):
+    engine.set_effect("dram1", "pulse", "00ff00", 255, 5)
+    ramp = pulse_ramp(5)
+    clock.now = engine.t0 + ramp
+    engine.frame = 0
+    engine.tick()
+    assert dram_led1(bus, 0) == (0, 255, 0)
+    clock.now = engine.t0 + 2 * ramp + 0.1
+    engine.frame = 0
+    engine.tick()
+    assert dram_led1(bus, 0) == (0, 0, 0)
+
+
+def test_single_color_headers_follow_at_the_memory_rate(engine, transport, clock):
+    engine.set_effect("led_c1", "cycle", "ffffff", 255, 0)
+    transport.sent.clear()
+    for _ in range(4):
+        clock.now += 0.1
+        engine.tick()
+    led_c1 = engine.zones["led_c1"][1]
+    effects = [pkt for pkt in transport.sent if pkt[1] == 0x20 + led_c1.index]
+    assert len(effects) == 2
+
+
+def test_an_unchanged_frame_is_not_sent_again(engine, transport, clock):
+    engine.set_effect("d_led1", "flash", "ff0000", 255, 9)
+    clock.now = engine.t0 + 0.5            # apagado entre dois flashes
+    engine.tick()
+    transport.sent.clear()
+    clock.now += 0.1
+    engine.tick()
+    assert board_frames(transport, 0x58) == []
 
 
 def test_a_new_command_ends_the_calibration_of_the_zone(engine):

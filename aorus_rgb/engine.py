@@ -1,7 +1,8 @@
 """Estado e animação de todas as zonas, sem D-Bus (usado pelo daemon).
 
 O motor é o único dono dos dispositivos: aplica cor, efeito, arco-íris ou
-desligado em cada zona, anima o arco-íris quadro a quadro e guarda a cena na
+desligado em cada zona, anima o arco-íris e os efeitos quadro a quadro num
+relógio comum (placa e memórias ficam em sincronia) e guarda a cena na
 configuração para restaurá-la no próximo boot.
 """
 
@@ -10,8 +11,10 @@ import time
 from . import protocol as p
 from .config import Config
 from .patterns import (
+    ANIMATED_EFFECTS,
     DRAM_FRAME_DIVIDER,
     RAINBOW_FPS,
+    effect_frame,
     light_first,
     palette_colors,
     rainbow_frame,
@@ -54,6 +57,7 @@ class Engine:
         self.scene = {}
         self.calibrating = set()
         self.listeners = []
+        self._shown = {}  # último quadro enviado a cada zona animada
 
     # --- consulta ------------------------------------------------------------
     def kind(self, name):
@@ -99,10 +103,7 @@ class Engine:
 
     @property
     def animated(self):
-        return [
-            n for n, spec in self.scene.items()
-            if spec["mode"] == "rainbow" and spec["speed"] > 0 and n not in self.calibrating
-        ]
+        return [n for n, spec in self.scene.items() if _moves(spec) and n not in self.calibrating]
 
     # --- comandos -------------------------------------------------------------
     def set_color(self, name, color):
@@ -199,32 +200,51 @@ class Engine:
         return ((now - self.t0) * speed * PHASE_PER_SECOND) % 1
 
     def tick(self):
-        """Um quadro do arco-íris animado; as memórias recebem 1 a cada N quadros."""
+        """Um quadro de cada zona animada. As memórias (SMBus) e os headers RGB
+        (um pacote de efeito por cor) recebem 1 a cada N quadros, sempre no
+        mesmo relógio, então seguem em fase com as fans."""
         now = self.clock()
         for name in self.animated:
-            if self.kind(name) == "dram" and self.frame % DRAM_FRAME_DIVIDER:
+            if self.kind(name) != "argb" and self.frame % DRAM_FRAME_DIVIDER:
                 continue
-            self._draw_rainbow(name, self.phase(self.scene[name]["speed"], now))
+            self._draw(name, now)
         self.frame += 1
 
     # --- interno ----------------------------------------------------------------
-    def _draw_rainbow(self, name, phase):
+    def _draw(self, name, now=None):
+        """Desenha o quadro atual da zona; não reenvia um quadro igual ao último."""
+        now = self.clock() if now is None else now
         ctl, zone = self.zones[name]
         spec = self.scene[name]
-        ctl.set_colors(zone, rainbow_frame(ctl.led_count(zone), phase, spec["brightness"] / 255))
+        n = ctl.led_count(zone) if self.kind(name) != "rgb" else 1
+        if spec["mode"] == "rainbow":
+            frame = rainbow_frame(n, self.phase(spec["speed"], now), spec["brightness"] / 255)
+        else:
+            frame = effect_frame(
+                spec["effect"], n, now - self.t0, parse_hex(spec["color"]),
+                spec["brightness"], spec["speed"],
+            )
+        if self._shown.get(name) == frame:
+            return
+        self._shown[name] = frame
+        if self.kind(name) == "rgb":
+            ctl.set_color(zone, frame[0])
+        else:
+            ctl.set_colors(zone, frame)
 
     def _apply(self, name, spec):
         ctl, zone = self.zones[name]
         self.calibrating.discard(name)  # um comando novo encerra a calibração da zona
+        self._shown.pop(name, None)
         mode = spec["mode"]
-        if mode == "color":
+        if _drawn(spec):
+            # primeiro quadro na hora; o arco-íris estático (speed 0) é só esse quadro
+            self.scene[name] = spec
+            self._draw(name)
+        elif mode == "color":
             ctl.set_color(zone, parse_hex(spec["color"]))
         elif mode == "effect":
             ctl.set_effect(zone, spec["effect"], parse_hex(spec["color"]), spec["brightness"], spec["speed"])
-        elif mode == "rainbow":
-            # primeiro quadro na hora; o arco-íris estático (speed 0) é só esse quadro
-            self.scene[name] = spec
-            self._draw_rainbow(name, self.phase(spec["speed"]))
         else:
             ctl.off(zone)
         self.scene[name] = spec
@@ -241,3 +261,14 @@ class Engine:
     def _notify(self):
         for listener in self.listeners:
             listener()
+
+
+def _drawn(spec):
+    """Zonas que o daemon desenha (arco-íris e efeitos animados)."""
+    return spec["mode"] == "rainbow" or (
+        spec["mode"] == "effect" and spec["effect"] in ANIMATED_EFFECTS
+    )
+
+
+def _moves(spec):
+    return _drawn(spec) and not (spec["mode"] == "rainbow" and spec["speed"] == 0)
