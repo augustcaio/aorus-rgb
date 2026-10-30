@@ -360,6 +360,60 @@ mod tests {
         assert_eq!(state_for(&look), ZoneState::Color(Rgb(100, 50, 0)));
     }
 
+    /// Contra o daemon real: aplica cada efeito pelo mesmo caminho da
+    /// interface, confere o estado relido e devolve o estado anterior.
+    /// `cargo test -- --ignored` com o daemon no D-Bus de sessão.
+    #[test]
+    #[ignore = "precisa do daemon rodando no D-Bus de sessão"]
+    fn live_daemon_roundtrip() {
+        glib::MainContext::default().block_on(async {
+            let backend = Backend::dbus().await.expect("daemon no D-Bus de sessão");
+            let signals = Rc::new(std::cell::Cell::new(0));
+            let counter = signals.clone();
+            backend.connect_changed(Rc::new(move || counter.set(counter.get() + 1)));
+            let before = backend.state().await.unwrap();
+
+            let cases = [
+                ("d_led1", Effect::ALL.as_slice()),
+                ("dram1", Effect::ALL.as_slice()),
+                (
+                    "led_c1",
+                    &[Effect::Static, Effect::Off, Effect::Pulse, Effect::Flash][..],
+                ),
+            ];
+            for (target, effects) in cases {
+                for &effect in effects {
+                    let look = Look {
+                        effect,
+                        color: Rgb(0, 120, 255),
+                        brightness: 200,
+                        speed: 7,
+                    };
+                    backend.apply(target, &look).await.unwrap();
+                    let state = backend.state().await.unwrap();
+                    assert_eq!(
+                        state.get(target),
+                        Some(&state_for(&look)),
+                        "{target} {effect:?}"
+                    );
+                }
+            }
+            assert!(
+                backend
+                    .apply("led_c1", &look(Effect::Rainbow))
+                    .await
+                    .is_err()
+            );
+
+            for (zone, state) in &before {
+                let look = Look::from_state(state, Look::default());
+                backend.apply(zone, &look).await.unwrap();
+            }
+            assert_eq!(backend.state().await.unwrap(), before);
+            assert!(signals.get() > 0, "nenhum StateChanged recebido");
+        });
+    }
+
     #[test]
     fn parses_daemon_state() {
         let fields: HashMap<String, glib::Variant> = [
