@@ -1,15 +1,16 @@
 # Maintainer: Caio Augusto <21364833+augustcaio@users.noreply.github.com>
 pkgname=aorus-rgb
-pkgver=1.1.0
+pkgver=2.0.0
 pkgrel=1
 pkgdesc="Controle RGB da Gigabyte B550M AORUS ELITE (ITE IT5702) e de memórias ENE"
 arch=('any')
 url="https://github.com/augustcaio/aorus-rgb"
 license=('GPL-2.0-or-later')
-depends=('python' 'python-gobject')
+depends=('python' 'python-gobject' 'glib2')
 makedepends=('git' 'python-build' 'python-installer' 'python-setuptools' 'python-wheel')
 checkdepends=('python-pytest')
-optdepends=('i2c-tools: diagnóstico do SMBus das memórias (i2cdetect)')
+optdepends=('aorus-rgb-gui: interface gráfica'
+            'i2c-tools: diagnóstico do SMBus das memórias (i2cdetect)')
 install=aorus-rgb.install
 source=("git+https://github.com/augustcaio/aorus-rgb.git#tag=v$pkgver")
 sha256sums=('SKIP')

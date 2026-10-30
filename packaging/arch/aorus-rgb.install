@@ -5,6 +5,7 @@ post_install() {
 ==> aorus-rgb instalado. Para o daemon restaurar as luzes no login (como
     usuário, sem sudo):
       systemctl --user enable --now aorus-rgb
+==> Interface gráfica: instale o pacote aorus-rgb-gui (AORUS RGB no menu).
 ==> As memórias RGB precisam do parâmetro de kernel acpi_enforce_resources=lax
     (UKI: /etc/kernel/cmdline + mkinitcpio -P; GRUB: GRUB_CMDLINE_LINUX_DEFAULT
     + grub-mkconfig). O pacote não altera o boot.
