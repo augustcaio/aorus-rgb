@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2e2e2e"/>
+      <stop offset="1" stop-color="#1b1b1b"/>
+    </linearGradient>
+    <linearGradient id="rgb" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff2a2a"/>
+      <stop offset="0.18" stop-color="#ff8a00"/>
+      <stop offset="0.34" stop-color="#ffe000"/>
+      <stop offset="0.5" stop-color="#20e060"/>
+      <stop offset="0.66" stop-color="#00c8ff"/>
+      <stop offset="0.82" stop-color="#3a5bff"/>
+      <stop offset="1" stop-color="#d020ff"/>
+    </linearGradient>
+  </defs>
+  <!-- base: frente escura e superfície de cima -->
+  <rect x="8" y="14" width="112" height="106" rx="20" fill="#0e0e0e"/>
+  <rect x="8" y="8" width="112" height="104" rx="20" fill="url(#top)"/>
+  <rect x="22" y="111" width="84" height="2" rx="1" fill="#e8641b"/>
+
+  <!-- falcão facetado, de perfil para a direita: cada face num tom -->
+  <g stroke-linejoin="round">
+    <!-- nuca e pescoço -->
+    <path fill="#d6d6d6" d="M28 94 L26 72 L36 50 L64 46 L68 62 L56 78 L50 94 Z"/>
+    <!-- topo da cabeça -->
+    <path fill="#f6f6f6" d="M36 50 L54 35 L82 30 L96 36 L64 46 Z"/>
+    <!-- face e bochecha -->
+    <path fill="#e9e9e9" d="M64 46 L96 36 L94 54 L84 60 L68 62 Z"/>
+    <!-- garganta -->
+    <path fill="#bdbdbd" d="M68 62 L84 60 L70 76 L56 78 Z"/>
+    <path fill="#a9a9a9" d="M56 78 L70 76 L58 94 L50 94 Z"/>
+    <!-- bico em gancho -->
+    <path fill="#8e9398" d="M96 36 L108 42 L113 56 L106 52 L94 54 Z"/>
+    <path fill="#6f7479" d="M106 52 L113 56 L108 65 Z"/>
+  </g>
+  <!-- olho afiado e a lágrima do peregrino -->
+  <path fill="#1b1b1b" d="M70 41 L90 37 L83 46 L72 45 Z"/>
+  <path fill="#ff8a3d" d="M80 40.5 L86 39.4 L83 43.6 Z"/>
+  <path fill="#1b1b1b" d="M75 47 L82 47 L68 68 L64 65 Z"/>
+
+  <!-- barra de luz RGB -->
+  <rect x="26" y="99" width="76" height="6" rx="3" fill="url(#rgb)"/>
+</svg>
