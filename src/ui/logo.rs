@@ -1,24 +1,19 @@
-//! Ícone do app no cabeçalho, com o arco-íris correndo pela silhueta, no
-//! ritmo do arco-íris padrão dos LEDs. A forma vem do ícone simbólico do
-//! pacote, lida aqui mesmo (só usa M, C e z absolutos), sem carregador de SVG.
-//! Com as animações do sistema desligadas, fica parado no degradê.
+//! Ícone do app no cabeçalho, em branco como o título. A forma vem do ícone
+//! simbólico do pacote, lida aqui mesmo (só usa M, C e z absolutos), sem
+//! carregador de SVG; assim o cabeçalho mostra sempre o ícone do projeto,
+//! mesmo que o tema de ícones do usuário tenha outro com o mesmo nome.
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Instant;
 
-use gtk::cairo::{self, Context, LinearGradient, Operator};
-use gtk::glib;
+use gtk::cairo::{self, Context, Operator};
 use gtk::prelude::*;
-
-use super::wheel::hsv_to_rgb;
 
 const SVG: &str = include_str!(
     "../../data/icons/hicolor/symbolic/apps/io.github.augustcaio.AorusRGB.Gui-symbolic.svg"
 );
-/// Voltas do arco-íris por segundo: velocidade 5 do daemon (5 * 0,03).
-const TURNS_PER_SECOND: f64 = 0.15;
-const STOPS: u32 = 12;
+/// Mesmo branco do título do cabeçalho.
+const COLOR: (f64, f64, f64) = (0.949, 0.949, 0.949);
 
 #[derive(Debug, PartialEq)]
 enum Seg {
@@ -166,7 +161,6 @@ fn mask(px: i32) -> Option<cairo::ImageSurface> {
 pub struct Logo {
     pub area: gtk::DrawingArea,
     cache: RefCell<Option<(i32, cairo::ImageSurface)>>,
-    start: Instant,
 }
 
 impl Logo {
@@ -180,19 +174,12 @@ impl Logo {
         let logo = Rc::new(Self {
             area: area.clone(),
             cache: RefCell::new(None),
-            start: Instant::now(),
         });
         let weak = Rc::downgrade(&logo);
         area.set_draw_func(move |area, cr, w, h| {
             if let Some(logo) = weak.upgrade() {
                 logo.draw(cr, w.min(h), area.scale_factor());
             }
-        });
-        area.add_tick_callback(|area, _| {
-            if animations_enabled() {
-                area.queue_draw();
-            }
-            glib::ControlFlow::Continue
         });
         logo
     }
@@ -208,27 +195,10 @@ impl Logo {
         let Some((_, surface)) = cache.as_ref() else {
             return;
         };
-        let phase = if animations_enabled() {
-            self.start.elapsed().as_secs_f64() * TURNS_PER_SECOND
-        } else {
-            0.0
-        };
-        // arco-íris na diagonal, andando como nos LEDs
-        let size = f64::from(size);
-        let gradient = LinearGradient::new(0.0, 0.0, size, size);
-        for i in 0..=STOPS {
-            let offset = f64::from(i) / f64::from(STOPS);
-            let (r, g, b) = hsv_to_rgb(offset - phase, 1.0, 1.0).to_f64();
-            gradient.add_color_stop_rgb(offset, r, g, b);
-        }
-        let _ = cr.set_source(&gradient);
+        cr.set_source_rgb(COLOR.0, COLOR.1, COLOR.2);
         cr.scale(1.0 / f64::from(scale.max(1)), 1.0 / f64::from(scale.max(1)));
         let _ = cr.mask_surface(surface, 0.0, 0.0);
     }
-}
-
-fn animations_enabled() -> bool {
-    gtk::Settings::default().is_none_or(|s| s.is_gtk_enable_animations())
 }
 
 #[cfg(test)]
@@ -255,7 +225,7 @@ mod tests {
         let paints: Vec<&Paint> = shapes.iter().map(|s| &s.paint).collect();
         assert_eq!(
             paints,
-            [&Paint::Fill, &Paint::Clear, &Paint::FillStroke(4.0)]
+            [&Paint::Fill, &Paint::Clear, &Paint::FillStroke(12.0)]
         );
         assert!(shapes.iter().all(|s| s.segs.len() > 3));
     }
