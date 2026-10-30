@@ -215,6 +215,7 @@ class Engine:
 
     def _apply(self, name, spec):
         ctl, zone = self.zones[name]
+        self.calibrating.discard(name)  # um comando novo encerra a calibração da zona
         mode = spec["mode"]
         if mode == "color":
             ctl.set_color(zone, parse_hex(spec["color"]))

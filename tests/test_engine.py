@@ -252,3 +252,10 @@ def test_parse_hex():
 def test_memory_mode_registers_on_effect(engine, bus):
     engine.set_effect("dram", "pulse", "00ff00")
     assert bus.chips[0].regs[ene.REG_MODE] == ene.MODES["breathing"]
+
+
+def test_a_new_command_ends_the_calibration_of_the_zone(engine):
+    """Regressão: a zona ficava fora do arco-íris para sempre depois de um check."""
+    engine.light_first("d_led1", 4)
+    engine.set_rainbow("d_led1")
+    assert engine.animated == ["d_led1"]
