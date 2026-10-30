@@ -19,7 +19,7 @@ use gtk::glib;
 use crate::Options;
 use crate::backend::Backend;
 use crate::model::{Device, Effect, Look, Zone, ZoneState};
-use controls::{COLOR_WIDTH, Controls, EFFECTS_WIDTH};
+use controls::Controls;
 
 // grade: margens de 12, colunas separadas por 18 (múltiplos de 6, como o libadwaita)
 const MARGIN: i32 = 12;
@@ -28,7 +28,9 @@ const LEFT_WIDTH: i32 = 358;
 const RAIL_SIZE: i32 = 24;
 const DIAGRAM_WIDTH: i32 = LEFT_WIDTH - 40 - MARGIN;
 const DIAGRAM_HEIGHT: i32 = 300;
-const WINDOW_WIDTH: i32 = MARGIN * 2 + LEFT_WIDTH + EFFECTS_WIDTH + COLOR_WIDTH + COLUMN_GAP * 2;
+// tela inicial: quadros de tamanho fixo; a coluna cresce com os dispositivos
+const TILE_SIZE: i32 = 104;
+const TILES_PER_ROW: usize = 3;
 use diagram::Diagram;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -109,8 +111,12 @@ pub fn build(app: &adw::Application, options: Options) {
     header.pack_end(&home_button);
 
     let banner = adw::Banner::new("");
+    // cada tela tem o próprio tamanho; a janela acompanha a tela visível
     let stack = gtk::Stack::builder()
         .transition_type(gtk::StackTransitionType::Crossfade)
+        .hhomogeneous(false)
+        .vhomogeneous(false)
+        .interpolate_size(true)
         .build();
     stack.add_css_class("main");
     let toolbar = adw::ToolbarView::new();
@@ -123,8 +129,7 @@ pub fn build(app: &adw::Application, options: Options) {
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title("AORUS RGB")
-        .default_width(WINDOW_WIDTH)
-        .default_height(470)
+        .resizable(false)
         .content(&toasts)
         .build();
     window.add_css_class("aorus");
@@ -234,7 +239,6 @@ impl App {
 
     /// Três colunas (dispositivo/zonas, efeito, cor) e o rodapé, na mesma grade.
     fn page(left: &gtk::Box, controls: &Controls, footer: &gtk::Box) -> gtk::Box {
-        left.set_width_request(LEFT_WIDTH);
         let columns = gtk::Box::builder()
             .spacing(COLUMN_GAP)
             .vexpand(true)
@@ -264,6 +268,8 @@ impl App {
         label.set_xalign(0.0);
         label.set_wrap(true);
         label.set_hexpand(true);
+        // largura natural curta: a dica quebra linha em vez de alargar a janela
+        label.set_max_width_chars(40);
         let footer = gtk::Box::new(gtk::Orientation::Horizontal, MARGIN);
         footer.append(&label);
         if let Some(actions) = actions {
@@ -275,6 +281,7 @@ impl App {
     fn build_home(self: &Rc<Self>) {
         let tiles = gtk::Grid::builder()
             .column_spacing(MARGIN)
+            .row_spacing(MARGIN)
             .column_homogeneous(true)
             .build();
         for (i, device) in Device::ALL.into_iter().enumerate() {
@@ -284,7 +291,8 @@ impl App {
             let frame = gtk::Button::builder()
                 .child(&icon)
                 .tooltip_text(format!("Ajustar {}", device.label()))
-                .height_request(104)
+                .width_request(TILE_SIZE)
+                .height_request(TILE_SIZE)
                 .build();
             frame.add_css_class("device-tile");
             let name = gtk::Label::new(Some(device.label()));
@@ -303,10 +311,9 @@ impl App {
                     });
                 }
             });
-            tiles.attach(&tile, i as i32, 0, 1, 1);
+            let (column, row) = (i % TILES_PER_ROW, i / TILES_PER_ROW);
+            tiles.attach(&tile, column as i32, row as i32, 1, 1);
         }
-        // terceira coluna vazia: mantém os quadros do mesmo tamanho da grade 3 x N
-        tiles.attach(&gtk::Box::new(gtk::Orientation::Horizontal, 0), 2, 0, 1, 1);
 
         let left = Self::section("Dispositivos", &tiles);
         let footer = Self::footer(
@@ -374,6 +381,7 @@ impl App {
         });
 
         let left = Self::section("Zonas", &zones);
+        left.set_width_request(LEFT_WIDTH);
         let footer = Self::footer(
             "Clique numa zona para selecioná-la; sem seleção, vale para o dispositivo inteiro. Posições ilustrativas.",
             Some(&actions),
