@@ -27,3 +27,5 @@ cache-dir = "~/.cache/aorus-rgb/ruff"
 testpaths = ["tests"]
 # sem .pytest_cache na pasta do projeto
 addopts = "-p no:cacheprovider"
+# avisos de dentro do PyGObject (asyncio do Python 3.16), não do projeto
+filterwarnings = ["ignore::DeprecationWarning:gi.events"]
