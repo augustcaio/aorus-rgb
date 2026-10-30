@@ -293,6 +293,25 @@ def cmd_run(devs, a):
     profile.fn(devs, profile)
 
 
+def cmd_daemon(devs, a):
+    """Dono do hardware: restaura a última cena e atende a CLI e a interface pelo D-Bus."""
+    try:
+        from . import dbus_service
+    except ImportError:
+        raise ValueError("o daemon precisa do PyGObject (pacote python-gobject)") from None
+    from .engine import Engine
+
+    pending = wait_for_device_access()
+    if pending:
+        warn(f"sem acesso após {RUN_WAIT_SECONDS}s: {', '.join(pending)}")
+    board = devs.get("board")
+    engine = Engine(board, devs.get("dram", required=False), board.config)
+    engine.restore()
+    code = dbus_service.run(engine)
+    if code:
+        sys.exit(code)
+
+
 def build_parser():
     ap = argparse.ArgumentParser(prog="aorus-rgb", description="Controle RGB da B550M Aorus Elite e das memórias")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -339,6 +358,10 @@ def build_parser():
     s.set_defaults(fn=cmd_profile)
 
     sub.add_parser("run", help="aplica o perfil salvo (usado pelo serviço)").set_defaults(fn=cmd_run)
+
+    sub.add_parser("daemon", help="daemon D-Bus: dono do hardware, usado pelo serviço e pela interface").set_defaults(
+        fn=cmd_daemon
+    )
 
     s = sub.add_parser("off", help="apaga uma zona")
     s.add_argument("zone", choices=ZONE_CHOICES, nargs="?", default="all")
