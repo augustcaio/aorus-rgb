@@ -81,7 +81,9 @@ fan), de qualquer marca. Ferramentas auxiliares:
     aorus-rgb count d_led1 12          # acende os primeiros 12 LEDs em branco
     aorus-rgb color d_led1 ff0000 --leds 60  # usa 60 LEDs só nesta execução
 
-## Serviço (iluminação automática no login)
+## Serviço na 1.x (iluminação automática no login)
+Na 2.0 o serviço roda o daemon D-Bus: veja [Daemon D-Bus](daemon.md).
+
 Branch `feat/service`. Escolha o perfil e instale o serviço de usuário (sem sudo):
 
     aorus-rgb profile rainbow all     # perfil padrão (ou: effect all pulse ff00ff, color all 00ff00...)

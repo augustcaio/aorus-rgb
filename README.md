@@ -27,12 +27,14 @@ de feature, que não compartilham arquivos com a `main`.
 | `feat/driver-it5702` | Driver USB HID, CLI, regra udev e `pyproject.toml` | incorporada na 1.0.0 |
 | `feat/dram-smbus` | Memórias RGB via SMBus (ENE); ramificada de `feat/driver-it5702` | incorporada na 1.0.0 |
 | `feat/service` | Perfil e serviço do systemd que aplica a iluminação no login; ramificada de `feat/dram-smbus` | incorporada na 1.0.0 |
-| `feat/packaging` | `PKGBUILD`, script de build da release e serviço em `/usr/bin`; ramificada de `feat/service` | incorporada na 1.1.0; base para o desenvolvimento seguinte |
+| `feat/packaging` | `PKGBUILD`, script de build da release e serviço em `/usr/bin`; ramificada de `feat/service` | incorporada na 1.1.0 |
+| `feat/daemon` | Daemon D-Bus dono do hardware, CLI cliente do daemon e perfis com nome; ramificada de `feat/packaging` | em desenvolvimento (2.0) |
 
 ## Documentação
 - [Hardware](docs/hardware.md)
 - [Protocolo IT5702](docs/protocol.md)
 - [Protocolo ENE (memórias)](docs/ene.md)
+- [Daemon D-Bus (2.0)](docs/daemon.md)
 - [Desenvolvimento e uso](docs/desenvolvimento.md)
 - [Convenções](CONTRIBUTING.md)
 
