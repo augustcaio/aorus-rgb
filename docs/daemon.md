@@ -1,6 +1,6 @@
 # Daemon D-Bus
 
-A partir da 2.0 (branch `feat/daemon`), o `aorus-rgb daemon` é o único processo
+A partir da 2.0, o `aorus-rgb daemon` é o único processo
 que fala com o hardware. O serviço do systemd roda o daemon; a CLI e a
 interface gráfica pedem a ele pelo barramento de sessão do usuário, então as
 cores não disputam o hardware entre programas.

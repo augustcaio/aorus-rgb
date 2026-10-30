@@ -6,21 +6,37 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 
 ## [Unreleased]
 
-Branch `feat/daemon`, a caminho da 2.0.
+## [2.0.0] - 2026-10-29
+
+Daemon dono do hardware e interface gráfica. Branch `release/2.0.0` (daemon e
+CLI na raiz, interface em `gui/`), tag `v2.0.0`.
 
 ### Added
+- Interface gráfica **AORUS RGB** (pacote `aorus-rgb-gui`, GTK 4 /
+  libadwaita, em Rust): efeitos e cores para todos os dispositivos ou por
+  zona, com a placa desenhada no leiaute do manual e os pentes de memória;
+  switch **Sincronizar** no cabeçalho; conectores sem nada ligado marcáveis
+  em **Menu → Conectores da placa**. Guia em `docs/interface.md`.
+- Ícone do app, `.desktop` e versão simbólica do ícone.
 - `aorus-rgb daemon`: daemon no D-Bus de sessão (`io.github.augustcaio.AorusRGB`),
   único dono do hardware, com zonas, estado, cor, efeito, arco-íris, perfis e
   calibração; restaura a última cena no login. Referência em `docs/daemon.md`.
 - Perfis com nome guardados pelo daemon (`profile list|save|apply|delete`).
 - Arquivo de ativação D-Bus, para um cliente iniciar o daemon pelo systemd.
+- `packaging/build.sh` gera também o pacote `aorus-rgb-gui`.
 
 ### Changed
 - **Quebra:** o serviço do systemd roda o daemon (`Type=dbus`) em vez do `run`,
   que foi removido; o perfil antigo (um comando salvo) foi substituído pelos
   perfis com nome. Atualização: `daemon-reload` e depois `restart`.
 - Com o daemon rodando, a CLI pede a ele; sem ele, fala direto com o hardware.
-- O pacote depende de `python-gobject`.
+- O pacote depende de `python-gobject` e `glib2`, e sugere o `aorus-rgb-gui`.
+
+### Fixed
+- Pulso, flash, ciclo e aleatório nas memórias saíam de fase com as fans:
+  eram modos de hardware de cada chip, com relógios e velocidades próprios. O
+  daemon agora desenha esses efeitos quadro a quadro num relógio comum, como
+  já fazia com o arco-íris.
 
 ## [1.1.0] - 2026-10-29
 
@@ -87,6 +103,7 @@ Primeira versão estável, validada na B550M AORUS ELITE. Branch
   o `run` agora espera o acesso à placa e às memórias.
 - Cores e arco-íris usavam 32 LEDs, independentemente das fans.
 
-[Unreleased]: https://github.com/augustcaio/aorus-rgb/compare/v1.1.0...feat/packaging
+[Unreleased]: https://github.com/augustcaio/aorus-rgb/compare/v2.0.0...release/2.0.0
+[2.0.0]: https://github.com/augustcaio/aorus-rgb/tree/v2.0.0
 [1.1.0]: https://github.com/augustcaio/aorus-rgb/tree/v1.1.0
 [1.0.0]: https://github.com/augustcaio/aorus-rgb/tree/v1.0.0
