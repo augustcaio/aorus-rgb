@@ -8,6 +8,7 @@ mod art;
 mod controls;
 mod diagram;
 mod icons;
+mod logo;
 mod theme;
 mod wheel;
 
@@ -138,6 +139,9 @@ pub fn build(app: &adw::Application, options: Options) {
         .primary(true)
         .build();
     let header = adw::HeaderBar::builder().show_title(false).build();
+    // ícone com o arco-íris correndo, antes do título
+    let logo = logo::Logo::new(22);
+    header.pack_start(&logo.area);
     header.pack_start(&title);
     header.pack_end(&menu_button);
     header.pack_end(&home_button);
@@ -217,7 +221,7 @@ pub fn build(app: &adw::Application, options: Options) {
     app_state.show(options.page);
 
     // a janela mantém o estado vivo; os callbacks guardam só referências fracas
-    let keep_alive = app_state.clone();
+    let keep_alive = (app_state.clone(), logo);
     window.connect_destroy(move |_| {
         let _ = &keep_alive;
     });

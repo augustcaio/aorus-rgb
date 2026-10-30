@@ -28,7 +28,7 @@ window.aorus headerbar {
   font-size: 15px;
   letter-spacing: 1px;
   color: #f2f2f2;
-  margin-left: 8px;
+  margin-left: 2px;
 }
 
 window.aorus button.device-tile {
