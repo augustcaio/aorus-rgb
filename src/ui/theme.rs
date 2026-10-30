@@ -113,10 +113,8 @@ window.aorus button.square-action {
 }
 window.aorus button.square-action:hover { background: #4a4a4a; }
 
-/* títulos de seção na mesma altura, com ou sem controle ao lado */
-.section-title { min-height: 22px; }
-
-/* switch de pílula compacto, no laranja do tema quando ligado */
+/* switch de pílula compacto no cabeçalho, no laranja do tema quando ligado */
+.sync-label { color: #b4b4b4; font-size: 11px; font-weight: 700; }
 window.aorus switch {
   min-width: 34px;
   min-height: 18px;

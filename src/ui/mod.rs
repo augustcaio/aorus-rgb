@@ -114,9 +114,22 @@ pub fn build(app: &adw::Application, options: Options) {
     title.add_css_class("app-title");
     let home_button = gtk::Button::from_icon_name("go-home-symbolic");
     home_button.set_tooltip_text(Some("Início"));
+    // sincronização vale para o app inteiro: fica no cabeçalho, ao lado do início
+    let settings = Settings::load(!options.mock);
+    let sync = gtk::Switch::builder()
+        .active(settings.sync())
+        .valign(gtk::Align::Center)
+        .build();
+    let sync_label = gtk::Label::new(Some("Sincronizar"));
+    sync_label.add_css_class("sync-label");
+    let sync_box = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    sync_box.set_tooltip_text(Some("Aplica o mesmo efeito em todos os dispositivos"));
+    sync_box.append(&sync_label);
+    sync_box.append(&sync);
     let header = adw::HeaderBar::builder().show_title(false).build();
     header.pack_start(&title);
     header.pack_end(&home_button);
+    header.pack_end(&sync_box);
 
     let banner = adw::Banner::new("");
     // cada tela tem o próprio tamanho; a janela acompanha a tela visível
@@ -156,13 +169,6 @@ pub fn build(app: &adw::Application, options: Options) {
             (device, button)
         })
         .collect();
-
-    let settings = Settings::load(!options.mock);
-    let sync = gtk::Switch::builder()
-        .active(settings.sync())
-        .valign(gtk::Align::Center)
-        .tooltip_text("Aplica o mesmo efeito em todos os dispositivos")
-        .build();
 
     let app_state = Rc::new(App {
         window: window.clone(),
@@ -246,30 +252,13 @@ impl App {
 
     /// Título da coluna e conteúdo, alinhados no topo e à esquerda.
     fn section(title: &str, child: &impl IsA<gtk::Widget>) -> gtk::Box {
-        Self::section_with(title, None, child)
-    }
-
-    /// Seção com um controle à direita do título (ex.: o switch de sincronizar).
-    /// Todos os títulos têm a mesma altura, então as colunas seguem alinhadas.
-    fn section_with(
-        title: &str,
-        suffix: Option<&gtk::Widget>,
-        child: &impl IsA<gtk::Widget>,
-    ) -> gtk::Box {
         let label = gtk::Label::new(Some(title));
         label.add_css_class("caption-heading");
         label.add_css_class("dim-label");
         label.set_xalign(0.0);
-        label.set_hexpand(true);
-        let header = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        header.add_css_class("section-title");
-        header.append(&label);
-        if let Some(suffix) = suffix {
-            header.append(suffix);
-        }
         let section = gtk::Box::new(gtk::Orientation::Vertical, 6);
         section.set_valign(gtk::Align::Start);
-        section.append(&header);
+        section.append(&label);
         section.append(child);
         section
     }
@@ -357,13 +346,7 @@ impl App {
             tiles.attach(&tile, column as i32, row as i32, 1, 1);
         }
 
-        let sync_label = gtk::Label::new(Some("Sincronizar"));
-        sync_label.add_css_class("caption");
-        sync_label.add_css_class("dim-label");
-        let sync = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-        sync.append(&sync_label);
-        sync.append(&self.sync);
-        let left = Self::section_with("Dispositivos", Some(sync.upcast_ref()), &tiles);
+        let left = Self::section("Dispositivos", &tiles);
         let footer = Self::footer(&self.home_hint, None);
         self.stack.add_named(
             &Self::page(&left, &self.home_controls, &footer),
