@@ -589,6 +589,7 @@ impl App {
     fn show_about(&self) {
         let about = adw::AboutDialog::builder()
             .application_name("AORUS RGB")
+            .application_icon(crate::APP_ID)
             .version(env!("CARGO_PKG_VERSION"))
             .developer_name("Caio Augusto")
             .license_type(gtk::License::Gpl20)

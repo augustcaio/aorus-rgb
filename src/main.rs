@@ -15,7 +15,8 @@ mod ui;
 use adw::prelude::*;
 use gtk::glib;
 
-const APP_ID: &str = "io.github.augustcaio.AorusRGB.Gui";
+/// Também é o nome do ícone, procurado no tema de ícones do sistema.
+pub const APP_ID: &str = "io.github.augustcaio.AorusRGB.Gui";
 
 #[derive(Clone, Debug, Default)]
 pub struct Options {
@@ -83,6 +84,7 @@ fn main() -> glib::ExitCode {
     app.connect_startup(|_| {
         adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
         ui::load_css();
+        gtk::Window::set_default_icon_name(APP_ID);
     });
     app.connect_activate(move |app| ui::build(app, options.clone()));
     // os argumentos já foram lidos acima; o GApplication não deve vê-los
