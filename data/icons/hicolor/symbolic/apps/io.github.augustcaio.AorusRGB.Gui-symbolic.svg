@@ -1,8 +1,23 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
-  <!-- falcão facetado em silhueta, com olho vazado, e a barra de luz -->
-  <path fill="#2e3436" fill-rule="evenodd" d="
-    M2.5 12.5 L2.3 9.2 L3.6 6.3 L6.5 4.2 L10 3.6 L12 4.4 L13.6 5.3 L14.3 7.4 L13.4 8.6
-    L13.2 7.2 L11.8 7.1 L10.6 8 L8.6 10.6 L7.2 12.5 Z
-    M8.7 5.3 L11.3 4.8 L10.4 6 L9 5.9 Z"/>
-  <rect x="2" y="13.6" width="12" height="1.4" rx="0.7" fill="#2e3436"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="16" height="16">
+  <!-- anel e águia em silhueta; o corte do bico e as penas vazados pela máscara -->
+  <defs>
+    <clipPath id="inside">
+      <circle cx="64" cy="64" r="44"/>
+    </clipPath>
+    <mask id="cuts">
+      <rect width="128" height="128" fill="#fff"/>
+      <g transform="translate(64 64) scale(0.95) translate(-64 -66)">
+        <path fill="none" stroke="#000" stroke-width="7" stroke-linecap="round" d="M86 48 C82 54 81 61 83 68"/>
+        <path fill="#000" d="M22 63 L40 59 L25 73 Z M22 81 L38 77 L24 91 Z"/>
+      </g>
+    </mask>
+  </defs>
+  <circle cx="64" cy="64" r="56" fill="none" stroke="#2e3436" stroke-width="12"/>
+  <g clip-path="url(#inside)" mask="url(#cuts)">
+    <path fill="#2e3436" transform="translate(64 64) scale(0.95) translate(-64 -66)" d="
+      M24 114 L26 72 C26 62 28 55 33 49 C37 43 40 39 45 36 L88 46
+      C98 46 106 54 106 64 C106 72 102 78 97 83
+      C99 77 97 72 92 70 L80 70
+      C71 72 64 80 62 93 L64 114 Z"/>
+  </g>
 </svg>
