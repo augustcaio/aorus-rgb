@@ -6,6 +6,22 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 
 ## [Unreleased]
 
+Branch `feat/daemon`, a caminho da 2.0.
+
+### Added
+- `aorus-rgb daemon`: daemon no D-Bus de sessão (`io.github.augustcaio.AorusRGB`),
+  único dono do hardware, com zonas, estado, cor, efeito, arco-íris, perfis e
+  calibração; restaura a última cena no login. Referência em `docs/daemon.md`.
+- Perfis com nome guardados pelo daemon (`profile list|save|apply|delete`).
+- Arquivo de ativação D-Bus, para um cliente iniciar o daemon pelo systemd.
+
+### Changed
+- **Quebra:** o serviço do systemd roda o daemon (`Type=dbus`) em vez do `run`,
+  que foi removido; o perfil antigo (um comando salvo) foi substituído pelos
+  perfis com nome. Atualização: `daemon-reload` e depois `restart`.
+- Com o daemon rodando, a CLI pede a ele; sem ele, fala direto com o hardware.
+- O pacote depende de `python-gobject`.
+
 ## [1.1.0] - 2026-10-29
 
 Pacotes de instalação, com as mesmas funções da 1.0.0. Branch
