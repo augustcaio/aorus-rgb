@@ -331,6 +331,12 @@ impl Controls {
         }
     }
 
+    /// Escolhe um visual como se o usuário tivesse mexido nos controles
+    /// (dispara `on_change`; usado pela gravação da demonstração).
+    pub fn pick(&self, look: Look) {
+        self.change(|current| *current = look);
+    }
+
     fn change(&self, edit: impl FnOnce(&mut Look)) {
         if self.updating.get() {
             return;

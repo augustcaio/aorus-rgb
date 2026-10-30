@@ -5,6 +5,8 @@
 //!   --screenshot ARQ     salva a janela em PNG e fecha (validação automática)
 //!   --page PÁGINA        página inicial: home, board ou memory
 //!   --dialog DIÁLOGO     abre um diálogo ao iniciar: connectors ou about
+//!   --record PASTA       percorre a interface sozinho e salva quadros PNG
+//!                        (para o GIF da documentação; use com --mock)
 
 mod backend;
 mod model;
@@ -24,6 +26,7 @@ pub struct Options {
     pub screenshot: Option<String>,
     pub page: ui::Page,
     pub dialog: Option<String>,
+    pub record: Option<String>,
 }
 
 fn parse_args() -> Result<Options, String> {
@@ -51,9 +54,12 @@ fn parse_args() -> Result<Options, String> {
                 }
                 options.dialog = Some(dialog);
             }
+            "--record" => {
+                options.record = Some(args.next().ok_or("--record precisa de uma pasta")?)
+            }
             "-h" | "--help" => {
                 println!(
-                    "uso: aorus-rgb-gui [--mock] [--screenshot ARQ.png] [--page home|board|memory] [--dialog connectors|about]"
+                    "uso: aorus-rgb-gui [--mock] [--screenshot ARQ.png] [--page home|board|memory] [--dialog connectors|about] [--record PASTA]"
                 );
                 std::process::exit(0);
             }
@@ -72,7 +78,7 @@ fn main() -> glib::ExitCode {
         }
     };
     // várias instâncias só para captura/simulação; o app normal é único
-    let flags = if options.mock || options.screenshot.is_some() {
+    let flags = if options.mock || options.screenshot.is_some() || options.record.is_some() {
         gtk::gio::ApplicationFlags::NON_UNIQUE
     } else {
         gtk::gio::ApplicationFlags::empty()

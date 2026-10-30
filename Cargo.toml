@@ -1,6 +1,6 @@
 [package]
 name = "aorus-rgb-gui"
-version = "0.1.0"
+version = "2.0.0"
 edition = "2024"
 description = "Interface GTK4/libadwaita do aorus-rgb (controle RGB da B550M AORUS ELITE)"
 license = "GPL-2.0-or-later"

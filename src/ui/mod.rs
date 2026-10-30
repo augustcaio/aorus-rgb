@@ -265,6 +265,10 @@ pub fn build(app: &adw::Application, options: Options) {
         });
     }
 
+    if let Some(dir) = options.record {
+        record(&app_state, &window, app, dir);
+    }
+
     if let Some(path) = options.screenshot {
         let app = app.clone();
         let window = window.clone();
@@ -289,6 +293,95 @@ pub fn build(app: &adw::Application, options: Options) {
             app.quit();
         });
     }
+}
+
+/// Demonstração para a documentação: percorre a interface num roteiro fixo e
+/// salva a janela em quadros PNG (frame-0001.png, ...) a 8 por segundo.
+fn record(
+    app_state: &Rc<App>,
+    window: &adw::ApplicationWindow,
+    app: &adw::Application,
+    dir: String,
+) {
+    use crate::model::Rgb;
+    const FRAME_MS: u64 = 125;
+    const END_MS: u64 = 19_000;
+    let look = |effect, color| Look {
+        effect,
+        color,
+        brightness: 255,
+        speed: 5,
+    };
+    type Step = Box<dyn Fn(&Rc<App>)>;
+    let steps: Vec<(u64, Step)> = vec![
+        (
+            1_500,
+            Box::new(move |a| a.home_controls.pick(look(Effect::Pulse, Rgb(255, 102, 0)))),
+        ),
+        (
+            4_000,
+            Box::new(move |a| a.home_controls.pick(look(Effect::Cycle, Rgb(255, 102, 0)))),
+        ),
+        (
+            6_000,
+            Box::new(move |a| {
+                a.home_controls
+                    .pick(look(Effect::Rainbow, Rgb(255, 102, 0)))
+            }),
+        ),
+        (7_500, Box::new(|a| a.show(Page::Board))),
+        (9_500, Box::new(|a| a.diagram.select(&["d_led1", "d_led2"]))),
+        (
+            10_300,
+            Box::new(move |a| {
+                a.device_controls
+                    .pick(look(Effect::Static, Rgb(0, 96, 255)))
+            }),
+        ),
+        (12_300, Box::new(|a| a.diagram.select(&["led_cpu"]))),
+        (
+            12_900,
+            Box::new(move |a| a.device_controls.pick(look(Effect::Flash, Rgb(255, 0, 40)))),
+        ),
+        (14_800, Box::new(|a| a.show(Page::Memory))),
+        (
+            15_400,
+            Box::new(move |a| {
+                a.device_controls
+                    .pick(look(Effect::Pulse, Rgb(200, 0, 220)))
+            }),
+        ),
+        (17_600, Box::new(|a| a.show(Page::Home))),
+    ];
+    for (at, step) in steps {
+        let weak = Rc::downgrade(app_state);
+        glib::timeout_add_local_once(Duration::from_millis(at), move || {
+            if let Some(a) = weak.upgrade() {
+                step(&a);
+            }
+        });
+    }
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        eprintln!("erro: não foi possível criar {dir}: {e}");
+        return;
+    }
+    let window = window.clone();
+    let app = app.clone();
+    let frame = Cell::new(0u64);
+    glib::timeout_add_local(Duration::from_millis(FRAME_MS), move || {
+        let n = frame.get() + 1;
+        frame.set(n);
+        let path = format!("{dir}/frame-{n:04}.png");
+        if let Err(message) = crate::screenshot::save(&window, &path) {
+            eprintln!("erro no quadro {n}: {message}");
+        }
+        if n * FRAME_MS >= END_MS {
+            println!("{n} quadros em {dir}");
+            app.quit();
+            return glib::ControlFlow::Break;
+        }
+        glib::ControlFlow::Continue
+    });
 }
 
 impl App {

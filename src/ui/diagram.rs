@@ -204,6 +204,17 @@ impl Diagram {
         self.area.queue_draw();
     }
 
+    /// Troca a seleção como se o usuário tivesse clicado (usado pela gravação
+    /// da demonstração).
+    pub fn select(&self, names: &[&str]) {
+        self.selected
+            .replace(names.iter().map(|n| (*n).to_owned()).collect());
+        self.area.queue_draw();
+        if let Some(f) = self.on_select.borrow().as_ref() {
+            f();
+        }
+    }
+
     /// Zonas selecionadas, na ordem do dispositivo.
     pub fn selected(&self) -> Vec<String> {
         let selected = self.selected.borrow();

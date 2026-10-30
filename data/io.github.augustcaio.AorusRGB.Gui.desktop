@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=AORUS RGB
+GenericName=Iluminação RGB
+Comment=Efeitos e cores da placa B550M AORUS ELITE e das memórias RGB
+Exec=aorus-rgb-gui
+Icon=io.github.augustcaio.AorusRGB.Gui
+Terminal=false
+StartupNotify=true
+Categories=Settings;HardwareSettings;
+Keywords=RGB;LED;ARGB;AORUS;Gigabyte;iluminação;memória;
