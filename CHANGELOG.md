@@ -6,6 +6,20 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-02
+
+Pacotes para o Fedora, com as mesmas funções da 2.0.0. Branch
+`release/2.0.1`, tag `v2.0.1`.
+
+### Added
+- `packaging/fedora/`: specs RPM `aorus-rgb` (noarch) e `aorus-rgb-gui`
+  (x86_64), com os testes no `%check`, e `build.sh`, que gera RPMs e SRPMs a
+  partir da tag num container Fedora e roda o `rpmlint`.
+
+### Changed
+- A mensagem de PyGObject ausente cita também o pacote do Fedora
+  (`python3-gobject`).
+
 ## [2.0.0] - 2026-10-29
 
 Daemon dono do hardware e interface gráfica. Branch `release/2.0.0` (daemon e
@@ -103,7 +117,8 @@ Primeira versão estável, validada na B550M AORUS ELITE. Branch
   o `run` agora espera o acesso à placa e às memórias.
 - Cores e arco-íris usavam 32 LEDs, independentemente das fans.
 
-[Unreleased]: https://github.com/augustcaio/aorus-rgb/compare/v2.0.0...release/2.0.0
+[Unreleased]: https://github.com/augustcaio/aorus-rgb/compare/v2.0.1...release/2.0.1
+[2.0.1]: https://github.com/augustcaio/aorus-rgb/tree/v2.0.1
 [2.0.0]: https://github.com/augustcaio/aorus-rgb/tree/v2.0.0
 [1.1.0]: https://github.com/augustcaio/aorus-rgb/tree/v1.1.0
 [1.0.0]: https://github.com/augustcaio/aorus-rgb/tree/v1.0.0

@@ -13,21 +13,29 @@ a interface gráfica **AORUS RGB**.
 
 ![A interface percorrendo tela inicial, placa e memórias](docs/images/interface.gif)
 
-## Instalação (Arch Linux)
+## Instalação
 Baixe os pacotes da [última release](https://github.com/augustcaio/aorus-rgb/releases/latest)
-e instale:
+e confira com `sha256sum -c SHA256SUMS --ignore-missing`.
 
-    sha256sum -c SHA256SUMS
+**Fedora:**
+
+    sudo dnf install ./aorus-rgb-*.noarch.rpm ./aorus-rgb-gui-*.x86_64.rpm
+    sudo grubby --update-kernel=ALL --args="acpi_enforce_resources=lax"
+
+**Arch Linux:**
+
     sudo pacman -U aorus-rgb-*.pkg.tar.zst aorus-rgb-gui-*.pkg.tar.zst
+
+O `grubby` é só para as memórias RGB; no Arch, o parâmetro de kernel é manual
+(veja [Desenvolvimento e uso](docs/desenvolvimento.md)). Reinicie e, como
+usuário, nos dois:
+
     systemctl --user enable --now aorus-rgb
     aorus-rgb calibrate d_led1   # uma vez por header ARGB, num terminal
 
 Depois, abra **AORUS RGB** no menu. O `aorus-rgb-gui` é opcional: sem ele, a
-CLI faz tudo pelo terminal.
-
-As memórias RGB precisam também do parâmetro de kernel
-`acpi_enforce_resources=lax` (veja [Desenvolvimento e uso](docs/desenvolvimento.md)).
-Para outras distribuições, a release traz um wheel Python do daemon e da CLI.
+CLI faz tudo pelo terminal. Para outras distribuições, a release traz um wheel
+Python do daemon e da CLI.
 
 **Vindo da 1.x:** o serviço passou a rodar o daemon. Depois de atualizar, como
 usuário: `systemctl --user daemon-reload && systemctl --user restart aorus-rgb`.
@@ -38,7 +46,8 @@ de feature, que não compartilham arquivos com a `main`.
 
 | Branch | Conteúdo | Estado |
 |--------|----------|--------|
-| `release/2.0.0` | **Versão estável 2.0.0** (tag `v2.0.0`): daemon, CLI e interface (em `gui/`); pacotes `aorus-rgb` e `aorus-rgb-gui` | estável |
+| `release/2.0.1` | **Versão estável 2.0.1** (tag `v2.0.1`): daemon, CLI e interface (em `gui/`); pacotes do Arch e do Fedora | estável |
+| `release/2.0.0` | Versão 2.0.0 (tag `v2.0.0`): daemon D-Bus e interface gráfica; pacotes do Arch | anterior |
 | `release/1.1.0` | Versão 1.1.0 (tag `v1.1.0`): pacote do Arch e wheel Python | anterior |
 | `release/1.0.0` | Versão 1.0.0 (tag `v1.0.0`): driver da placa, memórias e serviço | anterior |
 | `feat/driver-it5702` | Driver USB HID, CLI, regra udev e `pyproject.toml` | incorporada na 1.0.0 |
@@ -47,6 +56,7 @@ de feature, que não compartilham arquivos com a `main`.
 | `feat/packaging` | `PKGBUILD`, script de build da release e serviço em `/usr/bin`; ramificada de `feat/service` | incorporada na 1.1.0 |
 | `feat/daemon` | Daemon D-Bus dono do hardware, CLI cliente do daemon, perfis com nome e efeitos animados em sincronia; ramificada de `feat/packaging` | incorporada na 2.0.0 |
 | `feat/gui` | Interface GTK 4 / libadwaita em Rust, ícone e `.desktop` | incorporada na 2.0.0 |
+| `feat/fedora` | Specs RPM e build em container Fedora; ramificada de `release/2.0.0` | incorporada na 2.0.1 |
 
 ## Documentação
 - [Interface gráfica](docs/interface.md)

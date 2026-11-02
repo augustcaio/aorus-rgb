@@ -46,11 +46,14 @@ O prefixo `70-` é necessário: a tag `uaccess` precisa ser aplicada antes de
 ## SMBus das memórias (uma vez)
 Necessário só para as zonas `dram*` (branch `feat/dram-smbus`):
 
-1. Adicionar `acpi_enforce_resources=lax` ao fim de `/etc/kernel/cmdline`
-   (boot por UKI; com GRUB tradicional seria o `GRUB_CMDLINE_LINUX_DEFAULT`).
-2. `sudo mkinitcpio -P`
-3. `sudo pacman -S i2c-tools` e `echo i2c-dev | sudo tee /etc/modules-load.d/i2c-dev.conf`
-4. Reiniciar e conferir: `cat /sys/class/i2c-dev/*/name` deve listar
+1. Adicionar o parâmetro de kernel `acpi_enforce_resources=lax`:
+   - Fedora: `sudo grubby --update-kernel=ALL --args="acpi_enforce_resources=lax"`
+   - Arch com UKI: ao fim de `/etc/kernel/cmdline` e depois `sudo mkinitcpio -P`
+     (com GRUB tradicional, em `GRUB_CMDLINE_LINUX_DEFAULT`)
+2. Carregar o `i2c-dev` no boot (os pacotes já fazem isso):
+   `echo i2c-dev | sudo tee /etc/modules-load.d/i2c-dev.conf`. Para
+   diagnóstico, `i2c-tools` (`pacman -S` ou `dnf install`).
+3. Reiniciar e conferir: `cat /sys/class/i2c-dev/*/name` deve listar
    `SMBus PIIX4 adapter port 0 at 0b00`.
 
 ## Uso
@@ -114,11 +117,12 @@ suspensão, o hub das fans DarkFlash mostra o próprio efeito (arco-íris girand
 até a placa voltar a enviar dados.
 
 ## Pacote
-O pacote do Arch instala o programa em `/usr/bin/aorus-rgb`, a regra udev em
-`/usr/lib/udev/rules.d`, o serviço em `/usr/lib/systemd/user` e o
-`i2c-dev` em `/usr/lib/modules-load.d`. Não altera o boot.
+Os pacotes do Arch e do Fedora instalam o programa em `/usr/bin/aorus-rgb`, a
+regra udev em `/usr/lib/udev/rules.d`, o serviço em `/usr/lib/systemd/user` e
+o `i2c-dev` em `/usr/lib/modules-load.d`. Não alteram o boot.
 
-    sudo pacman -U aorus-rgb-*.pkg.tar.zst
+    sudo pacman -U aorus-rgb-*.pkg.tar.zst              # Arch
+    sudo dnf install ./aorus-rgb-*.noarch.rpm           # Fedora
     systemctl --user enable --now aorus-rgb
 
 Quem usava a instalação de desenvolvimento precisa removê-la antes, porque ela
@@ -131,6 +135,14 @@ pasta do projeto (requer `base-devel python-build python-installer
 python-pytest`; `namcap` é opcional):
 
     packaging/build.sh v1.1.0      # saída em ~/.cache/aorus-rgb/dist/v1.1.0
+
+Os RPMs do Fedora saem de um container (podman ou docker), também a partir da
+tag, com os testes no `%check` e o `rpmlint` no fim:
+
+    packaging/fedora/build.sh v2.0.1   # saída em ~/.cache/aorus-rgb/dist/fedora/v2.0.1
+
+O spec da interface baixa as crates Rust durante o build; num projeto COPR é
+preciso liberar o acesso à rede.
 
 O `namcap` acusa `aorus_rgb.__main__.main` como dependência não instalada:
 é falso positivo, porque `main` é uma função e o módulo está no próprio pacote.

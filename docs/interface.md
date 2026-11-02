@@ -46,7 +46,8 @@ As preferências da interface (sincronização e conectores vazios) ficam em
 
 ## Instalação
 
-    sudo pacman -U aorus-rgb-2.0.0-1-any.pkg.tar.zst aorus-rgb-gui-2.0.0-1-x86_64.pkg.tar.zst
+    sudo dnf install ./aorus-rgb-*.noarch.rpm ./aorus-rgb-gui-*.x86_64.rpm   # Fedora
+    sudo pacman -U aorus-rgb-*.pkg.tar.zst aorus-rgb-gui-*.pkg.tar.zst      # Arch
     systemctl --user enable --now aorus-rgb
 
 O app aparece no menu como **AORUS RGB** (`aorus-rgb-gui` no terminal). Se o
