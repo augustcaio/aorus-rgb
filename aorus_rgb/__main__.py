@@ -280,7 +280,7 @@ def cmd_daemon(devs, a):
     try:
         from . import dbus_service
     except ImportError:
-        raise ValueError("o daemon precisa do PyGObject (pacote python-gobject)") from None
+        raise ValueError("o daemon precisa do PyGObject (python-gobject no Arch, python3-gobject no Fedora)") from None
     from .engine import Engine
 
     pending = wait_for_device_access()

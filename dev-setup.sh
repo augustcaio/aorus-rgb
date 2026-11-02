@@ -11,7 +11,8 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV="${AORUS_RGB_VENV:-$HOME/.venvs/aorus-rgb}"
 CACHE="$HOME/.cache/aorus-rgb"
 
-# pacotes do sistema visíveis: o daemon usa o PyGObject (python-gobject) do Arch
+# pacotes do sistema visíveis: o daemon usa o PyGObject do sistema
+# (python-gobject no Arch, python3-gobject no Fedora)
 python -m venv --system-site-packages "$VENV"
 "$VENV/bin/pip" install -q --upgrade "pytest>=8" "ruff>=0.6"
 
