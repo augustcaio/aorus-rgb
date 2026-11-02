@@ -1,5 +1,5 @@
 Name:           aorus-rgb
-Version:        2.0.0
+Version:        2.0.1
 Release:        1%{?dist}
 Summary:        RGB lighting control for the Gigabyte B550M AORUS ELITE and ENE memory
 License:        GPL-2.0-or-later
@@ -59,5 +59,8 @@ install -Dpm644 packaging/dbus/io.github.augustcaio.AorusRGB.service \
 %{_datadir}/dbus-1/services/io.github.augustcaio.AorusRGB.service
 
 %changelog
+* Mon Nov 02 2026 Caio Augusto <21364833+augustcaio@users.noreply.github.com> - 2.0.1-1
+- Versão 2.0.1: primeira publicada com pacotes para o Fedora
+
 * Mon Nov 02 2026 Caio Augusto <21364833+augustcaio@users.noreply.github.com> - 2.0.0-1
 - Primeiro pacote para o Fedora
