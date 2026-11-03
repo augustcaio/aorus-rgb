@@ -15,6 +15,10 @@ TAG="${1:?uso: packaging/fedora/build.sh vX.Y.Z [pasta-de-saída] [imagem]}"
 OUT="${2:-$HOME/.cache/aorus-rgb/dist/fedora/$TAG}"
 IMAGE="${3:-registry.fedoraproject.org/fedora:45}"
 ENGINE="$(command -v podman || command -v docker)" || { echo "erro: precisa de podman ou docker" >&2; exit 1; }
+# dono dos arquivos gerados, visto de dentro do container; no podman sem root,
+# o root do container já é o usuário do host
+owner="$(id -u):$(id -g)"
+[[ "$("$ENGINE" info --format '{{.Host.Security.Rootless}}' 2>/dev/null)" == true ]] && owner=0:0
 
 git -C "$REPO" rev-parse -q --verify "refs/tags/$TAG" >/dev/null || { echo "erro: tag $TAG não existe" >&2; exit 1; }
 version="${TAG#v}"
@@ -48,7 +52,7 @@ cp "$HERE"/*.spec "$WORK/SPECS/"
     rpmlint /work/RPMS/*/*.rpm /work/SRPMS/*.src.rpm || true
     cp /work/RPMS/*/*.rpm /work/SRPMS/*.src.rpm /out/
     # arquivos criados como root no container: devolve ao usuário (saída e limpeza)
-    chown -R '"$(id -u):$(id -g)"' /out /work
+    chown -R '"$owner"' /out /work
 '
 
 (cd "$OUT" && sha256sum ./*.rpm > SHA256SUMS)
