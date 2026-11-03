@@ -46,6 +46,10 @@ install -Dpm644 packaging/dbus/io.github.augustcaio.AorusRGB.service \
 
 %post
 %udev_rules_update
+# instalado depois do boot: aplica a regra aos dispositivos já presentes, sem
+# reiniciar (o reload do udev pelo file trigger só vem no fim da transação)
+udevadm control --reload 2>/dev/null || :
+udevadm trigger --action=change --subsystem-match=hidraw --subsystem-match=i2c-dev 2>/dev/null || :
 %systemd_user_post aorus-rgb.service
 
 %preun

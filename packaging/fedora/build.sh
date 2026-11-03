@@ -6,14 +6,14 @@
 #   e os .src.rpm, para o COPR ou para reconstruir
 #
 # Uso: packaging/fedora/build.sh vX.Y.Z [pasta-de-saída] [imagem]
-# Imagem padrão: registry.fedoraproject.org/fedora:latest
+# Imagem padrão: registry.fedoraproject.org/fedora:45 (RPMs .fc45)
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
 TAG="${1:?uso: packaging/fedora/build.sh vX.Y.Z [pasta-de-saída] [imagem]}"
 OUT="${2:-$HOME/.cache/aorus-rgb/dist/fedora/$TAG}"
-IMAGE="${3:-registry.fedoraproject.org/fedora:latest}"
+IMAGE="${3:-registry.fedoraproject.org/fedora:45}"
 ENGINE="$(command -v podman || command -v docker)" || { echo "erro: precisa de podman ou docker" >&2; exit 1; }
 
 git -C "$REPO" rev-parse -q --verify "refs/tags/$TAG" >/dev/null || { echo "erro: tag $TAG não existe" >&2; exit 1; }
