@@ -1,5 +1,5 @@
 Name:           aorus-rgb
-Version:        2.0.1
+Version:        2.0.2
 Release:        1%{?dist}
 Summary:        RGB lighting control for the Gigabyte B550M AORUS ELITE and ENE memory
 License:        GPL-2.0-or-later
@@ -63,6 +63,11 @@ udevadm trigger --action=change --subsystem-match=hidraw --subsystem-match=i2c-d
 %{_datadir}/dbus-1/services/io.github.augustcaio.AorusRGB.service
 
 %changelog
+* Tue Nov 03 2026 Caio Augusto <21364833+augustcaio@users.noreply.github.com> - 2.0.2-1
+- Versão 2.0.2: RPM gerado no Fedora 45
+- count salva a quantidade de LEDs, com ou sem o daemon (#1)
+- A instalação aplica a regra udev aos dispositivos já presentes, sem reiniciar
+
 * Mon Nov 02 2026 Caio Augusto <21364833+augustcaio@users.noreply.github.com> - 2.0.1-1
 - Versão 2.0.1: primeira publicada com pacotes para o Fedora
 

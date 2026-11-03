@@ -2,7 +2,7 @@
 %global debug_package %{nil}
 
 Name:           aorus-rgb-gui
-Version:        2.0.1
+Version:        2.0.2
 Release:        1%{?dist}
 Summary:        GTK interface for aorus-rgb
 # o código é GPL; as crates Rust embutidas no binário são MIT ou Apache-2.0
@@ -55,6 +55,9 @@ install -Dpm644 gui/data/icons/hicolor/symbolic/apps/io.github.augustcaio.AorusR
 %{_datadir}/icons/hicolor/symbolic/apps/io.github.augustcaio.AorusRGB.Gui-symbolic.svg
 
 %changelog
+* Tue Nov 03 2026 Caio Augusto <21364833+augustcaio@users.noreply.github.com> - 2.0.2-1
+- Versão 2.0.2: RPM gerado no Fedora 45; sem mudanças na interface
+
 * Mon Nov 02 2026 Caio Augusto <21364833+augustcaio@users.noreply.github.com> - 2.0.1-1
 - Versão 2.0.1: primeira publicada com pacotes para o Fedora
 

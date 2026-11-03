@@ -1,6 +1,6 @@
 # Maintainer: Caio Augusto <21364833+augustcaio@users.noreply.github.com>
 pkgname=aorus-rgb-gui
-pkgver=2.0.1
+pkgver=2.0.2
 pkgrel=1
 pkgdesc="Interface GTK do aorus-rgb: efeitos e cores da B550M AORUS ELITE e das memórias RGB"
 arch=('x86_64')
