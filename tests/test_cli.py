@@ -148,9 +148,12 @@ def test_count_lights_first_n_white_and_clears_the_rest(controller, transport):
     assert data[20 * 3:] == bytes(12 * 3)
 
 
-def test_count_grows_the_strip_when_needed(controller):
-    run(cmd_count, controller, "count", "d_led1", "40")
-    assert controller.led_count(p.ZONES["d_led1"]) == 64
+@pytest.mark.parametrize("n", [20, 40])
+def test_count_saves_the_led_count(controller, capsys, n):
+    run(cmd_count, controller, "count", "d_led1", str(n))
+    assert controller.config.leds("d_led1") == n
+    assert controller.led_count(p.ZONES["d_led1"]) == n
+    assert f"d_led1: {n} LEDs, salvo em" in capsys.readouterr().out
 
 
 def test_check_paints_distinct_colors_and_clears_the_rest(controller, transport, capsys):

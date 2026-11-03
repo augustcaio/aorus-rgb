@@ -174,7 +174,10 @@ def cmd_rainbow(devs, a):
 
 def cmd_count(devs, a):
     board, (z,) = board_argb(a.zone, devs)
+    board.set_chip_led_count(z, a.n)
+    board.config.set_leds(z.name, a.n)
     light_first(board, z, a.n)
+    print(f"{z.name}: {a.n} LEDs, salvo em {board.config.path}")
 
 
 def cmd_check(devs, a):
@@ -295,7 +298,7 @@ def cmd_daemon(devs, a):
 
 
 # --- comandos pelo daemon ------------------------------------------------------
-LEDS_NEED_DIRECT = "--leds muda a capacidade do chip e pede o daemon parado; use calibrate ou check --leds"
+LEDS_NEED_DIRECT = "--leds muda a capacidade do chip e pede o daemon parado; para salvar, use count ou calibrate"
 
 
 def to_hex(color):
@@ -348,7 +351,15 @@ def daemon_off(client, a):
 
 
 def daemon_count(client, a):
-    raise ValueError(f"com o daemon rodando, use: aorus-rgb check {a.zone} --leds {a.n}")
+    client.call("SetLedCount", "(su)", a.zone, a.n)
+    client.call("LightFirst", "(su)", a.zone, a.n)
+    print(f"{a.zone}: {a.n} LEDs, salvo pelo daemon")
+    try:
+        input("Enter para voltar ao estado anterior... ")
+    except EOFError:
+        pass  # sem terminal: volta na hora, a contagem já foi salva
+    finally:
+        client.call("EndCalibration", "(s)", a.zone)
 
 
 def daemon_check(client, a):
@@ -423,7 +434,7 @@ def build_parser():
     s.add_argument("--brightness", type=int, default=255)
     s.set_defaults(fn=cmd_rainbow)
 
-    s = sub.add_parser("count", help="acende os primeiros N LEDs em branco, para contar a faixa")
+    s = sub.add_parser("count", help="salva N LEDs no header ARGB e acende os primeiros N, para conferir")
     s.add_argument("zone", choices=ARGB_CHOICES)
     s.add_argument("n", type=int, choices=range(1, CALIBRATE_MAX + 1), metavar="N", help=f"1-{CALIBRATE_MAX}")
     s.set_defaults(fn=cmd_count)

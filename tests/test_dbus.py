@@ -203,12 +203,26 @@ def test_cli_shows_daemon_errors(cli_daemon):
     assert str(excinfo.value) == "erro: zona desconhecida: dram3"  # sem o prefixo GDBus.Error
 
 
-def test_cli_leds_and_count_need_the_daemon_stopped(cli_daemon):
+def test_cli_leds_need_the_daemon_stopped(cli_daemon):
     cli, _ = cli_daemon
     with pytest.raises(SystemExit, match="--leds"):
         cli.main(["color", "d_led1", "ff0000", "--leds", "20"])
-    with pytest.raises(SystemExit, match="check d_led1 --leds 12"):
-        cli.main(["count", "d_led1", "12"])
+
+
+@pytest.mark.parametrize("answer", [lambda prompt: "", None])
+def test_cli_count_saves_through_the_daemon(cli_daemon, monkeypatch, capsys, answer):
+    cli, engine = cli_daemon
+    cli.main(["rainbow", "d_led1"])
+
+    def no_stdin(prompt):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", answer or no_stdin)
+    cli.main(["count", "d_led1", "12"])
+    assert engine.config.leds("d_led1") == 12
+    assert "d_led1: 12 LEDs, salvo pelo daemon" in capsys.readouterr().out
+    assert engine.calibrating == set()  # com ou sem terminal, a zona volta ao arco-íris
+    assert "d_led1" in engine.animated
 
 
 def test_cli_info_through_the_daemon(cli_daemon, capsys):
