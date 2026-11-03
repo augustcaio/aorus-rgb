@@ -90,8 +90,9 @@ o D-Bus explicam a diferença para os 9 MB do serviço 1.x).
 
 Com o daemon rodando, `info`, `color`, `effect`, `rainbow`, `off`, `check`,
 `calibrate` e `profile` viram chamadas D-Bus; sem ele, a CLI fala direto com o
-hardware, como na 1.x. `count` e `--leds` mudam a capacidade do chip debaixo da
-animação e pedem o daemon parado.
+hardware, como na 1.x. `count` também passa pelo daemon (`SetLedCount`) e salva
+a quantidade de LEDs. Só `--leds`, que muda a capacidade do chip numa única
+execução, pede o daemon parado.
 
     aorus-rgb profile save noite
     aorus-rgb profile apply noite

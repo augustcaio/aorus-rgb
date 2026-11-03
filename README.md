@@ -46,7 +46,8 @@ de feature, que não compartilham arquivos com a `main`.
 
 | Branch | Conteúdo | Estado |
 |--------|----------|--------|
-| `release/2.0.1` | **Versão estável 2.0.1** (tag `v2.0.1`): daemon, CLI e interface (em `gui/`); pacotes do Arch e do Fedora | estável |
+| `release/2.0.2` | **Versão estável 2.0.2** (tag `v2.0.2`): daemon, CLI e interface (em `gui/`); pacotes do Arch e do Fedora 45 | estável |
+| `release/2.0.1` | Versão 2.0.1 (tag `v2.0.1`): primeiros pacotes do Fedora | anterior |
 | `release/2.0.0` | Versão 2.0.0 (tag `v2.0.0`): daemon D-Bus e interface gráfica; pacotes do Arch | anterior |
 | `release/1.1.0` | Versão 1.1.0 (tag `v1.1.0`): pacote do Arch e wheel Python | anterior |
 | `release/1.0.0` | Versão 1.0.0 (tag `v1.0.0`): driver da placa, memórias e serviço | anterior |
@@ -57,6 +58,7 @@ de feature, que não compartilham arquivos com a `main`.
 | `feat/daemon` | Daemon D-Bus dono do hardware, CLI cliente do daemon, perfis com nome e efeitos animados em sincronia; ramificada de `feat/packaging` | incorporada na 2.0.0 |
 | `feat/gui` | Interface GTK 4 / libadwaita em Rust, ícone e `.desktop` | incorporada na 2.0.0 |
 | `feat/fedora` | Specs RPM e build em container Fedora; ramificada de `release/2.0.0` | incorporada na 2.0.1 |
+| `feat/fedora45` | `count` salva a quantidade de LEDs, regra udev aplicada na instalação e build no Fedora 45; ramificada de `release/2.0.1` | incorporada na 2.0.2 |
 
 ## Documentação
 - [Interface gráfica](docs/interface.md)

@@ -6,6 +6,23 @@ versionamento [SemVer](https://semver.org/lang/pt-BR/). Commits seguem
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-11-03
+
+Correções da 2.0.1 e RPMs do Fedora 45. Branch `release/2.0.2`, tag `v2.0.2`.
+
+### Fixed
+- `count` salva a quantidade de LEDs do header, com ou sem o daemon; antes só
+  acendia os primeiros LEDs e, com o daemon rodando, recusava
+  ([#1](https://github.com/augustcaio/aorus-rgb/issues/1)).
+- A regra udev vale logo depois de instalar o pacote, sem reiniciar: o RPM
+  recarrega o udev e reaplica a regra aos dispositivos já presentes (antes,
+  `/dev/hidraw*` e `/dev/i2c-*` ficavam só para root e o serviço repetia
+  `sem permissão`). No Arch, o hook do systemd no pacman já fazia isso.
+
+### Changed
+- RPMs gerados no Fedora 45 (`.fc45`): `packaging/fedora/build.sh` usa a
+  imagem `fedora:45` em vez de `fedora:latest`.
+
 ## [2.0.1] - 2026-11-02
 
 Pacotes para o Fedora, com as mesmas funções da 2.0.0. Branch
@@ -117,7 +134,8 @@ Primeira versão estável, validada na B550M AORUS ELITE. Branch
   o `run` agora espera o acesso à placa e às memórias.
 - Cores e arco-íris usavam 32 LEDs, independentemente das fans.
 
-[Unreleased]: https://github.com/augustcaio/aorus-rgb/compare/v2.0.1...release/2.0.1
+[Unreleased]: https://github.com/augustcaio/aorus-rgb/compare/v2.0.2...release/2.0.2
+[2.0.2]: https://github.com/augustcaio/aorus-rgb/tree/v2.0.2
 [2.0.1]: https://github.com/augustcaio/aorus-rgb/tree/v2.0.1
 [2.0.0]: https://github.com/augustcaio/aorus-rgb/tree/v2.0.0
 [1.1.0]: https://github.com/augustcaio/aorus-rgb/tree/v1.1.0

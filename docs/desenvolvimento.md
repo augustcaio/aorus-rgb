@@ -81,7 +81,7 @@ Funciona com fans em cadeia (soma dos LEDs) ou em splitter/hub (LEDs da maior
 fan), de qualquer marca. Ferramentas auxiliares:
 
     aorus-rgb check d_led1 --leds 24   # testa outra quantidade sem salvar
-    aorus-rgb count d_led1 12          # acende os primeiros 12 LEDs em branco
+    aorus-rgb count d_led1 12          # salva 12 LEDs e acende os primeiros 12 em branco
     aorus-rgb color d_led1 ff0000 --leds 60  # usa 60 LEDs só nesta execução
 
 ## Serviço na 1.x (iluminação automática no login)
@@ -137,9 +137,10 @@ python-pytest`; `namcap` é opcional):
     packaging/build.sh v1.1.0      # saída em ~/.cache/aorus-rgb/dist/v1.1.0
 
 Os RPMs do Fedora saem de um container (podman ou docker), também a partir da
-tag, com os testes no `%check` e o `rpmlint` no fim:
+tag, com os testes no `%check` e o `rpmlint` no fim (imagem padrão
+`fedora:45`; outra imagem no terceiro argumento):
 
-    packaging/fedora/build.sh v2.0.1   # saída em ~/.cache/aorus-rgb/dist/fedora/v2.0.1
+    packaging/fedora/build.sh v2.0.2   # saída em ~/.cache/aorus-rgb/dist/fedora/v2.0.2
 
 O spec da interface baixa as crates Rust durante o build; num projeto COPR é
 preciso liberar o acesso à rede.
